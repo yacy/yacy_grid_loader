@@ -31,13 +31,13 @@ import net.yacy.grid.mcp.Service;
 
 public class Loader {
 
-    private final static YaCyServices SERVICE = YaCyServices.mcp;
+    private final static YaCyServices SERVICE = YaCyServices.loader;
     private final static String DATA_PATH = "data";
     private final static String APP_PATH = "loader";
  
     // define services
     @SuppressWarnings("unchecked")
-    public final static Class<? extends Servlet>[] PARSER_SERVICES = new Class[]{
+    public final static Class<? extends Servlet>[] LOADER_SERVICES = new Class[]{
             // information services
             LoaderService.class
     };
@@ -45,7 +45,7 @@ public class Loader {
     public static void main(String[] args) {
         List<Class<? extends Servlet>> services = new ArrayList<>();
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
-        services.addAll(Arrays.asList(PARSER_SERVICES));
+        services.addAll(Arrays.asList(LOADER_SERVICES));
         Service.runService(SERVICE, DATA_PATH, APP_PATH, services);
     }
     

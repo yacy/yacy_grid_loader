@@ -28,6 +28,7 @@ import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.http.Query;
 import net.yacy.grid.http.ServiceResponse;
 
+
 public class LoaderService extends ObjectAPIHandler implements APIHandler {
 
     private static final long serialVersionUID = 8578474303031749879L;
@@ -37,6 +38,22 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
     public String getAPIPath() {
         return "/yacy/grid/loader/" + NAME + ".json";
     }
+    
+    /*
+     * engines to be considered:
+     * 
+     * https://www.teamdev.com/jxbrowser
+     * no maven repository!
+     * 
+     * http://phantomjs.org/
+     * has it's own binary JavaScript framework which is not easy to integrate
+     * 
+     * http://jaunt-api.com/
+     * That has a just crazy monthly-expiring license and no maven support
+     * 
+     * http://htmlunit.sourceforge.net/
+     * good!
+     */
     
     @Override
     public ServiceResponse serviceImpl(Query call, HttpServletResponse response) {

@@ -12,7 +12,7 @@ sourceSets {
 }
 
 mainClassName = "net.yacy.grid.loader.Loader"
-applicationDefaultJvmArgs = ["-Xmx96m"]
+applicationDefaultJvmArgs = ["-Xmx1024m"]
 
 group = 'net.yacy'
 version = '0.0.1-SNAPSHOT'
@@ -41,6 +41,7 @@ dependencies {
     compile group: 'commons-net', name: 'commons-net', version: '3.5'
     compile group: 'jcifs', name: 'jcifs', version: '1.3.17'
     compile group: 'org.elasticsearch.client', name: 'transport', version: '5.2.1'
-    
-    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.26'
+
+    compile group: 'org.jwat', name: 'jwat-warc', version: '1.0.5'
+    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.24'
 }

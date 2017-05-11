@@ -29,7 +29,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 /**
  * http://htmlunit.sourceforge.net/
  */
-public class HtmlUnitLoader implements LoaderInterface {
+public class HtmlUnitLoader {
 
     private static WebClient client;
     static {

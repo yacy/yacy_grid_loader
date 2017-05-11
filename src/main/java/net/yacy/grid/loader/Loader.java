@@ -38,7 +38,7 @@ public class Loader {
     // define services
     @SuppressWarnings("unchecked")
     public final static Class<? extends Servlet>[] LOADER_SERVICES = new Class[]{
-            // information services
+            // app services
             LoaderService.class
     };
     

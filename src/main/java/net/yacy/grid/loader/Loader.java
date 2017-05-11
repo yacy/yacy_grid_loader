@@ -19,13 +19,25 @@
 
 package net.yacy.grid.loader;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.servlet.Servlet;
 
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
+import ai.susi.mind.SusiAction;
+import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
+import net.yacy.grid.http.ObjectAPIHandler;
+import net.yacy.grid.io.assets.StorageFactory;
+import net.yacy.grid.io.messages.MessageContainer;
 import net.yacy.grid.loader.api.LoaderService;
+import net.yacy.grid.loader.api.ProcessService;
+import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 
@@ -39,14 +51,81 @@ public class Loader {
     @SuppressWarnings("unchecked")
     public final static Class<? extends Servlet>[] LOADER_SERVICES = new Class[]{
             // app services
-            LoaderService.class
+            LoaderService.class,
+            ProcessService.class
     };
     
+    /**
+     * broker listener, takes process messages from the queue "loader", "loader"
+     * i.e. test with:
+     * curl -X POST -F "message=@job.json" -F "serviceName=loader" -F "queueName=loader" http://yacygrid.com:8100/yacy/grid/mcp/messages/send.json
+     * where job.json is:
+{
+  "metadata": {
+    "process": "yacy_grid_loader",
+    "count": 0
+  },
+  "data": [{"collection": "test"}],
+  "actions": [{
+    "urls": ["http://yacy.net"],
+    "collection": "test",
+    "targetasset": "test3/yacy.net.warc.gz",
+    "type": "loader",
+    "queue": "loader"
+  }]
+}
+     */
+    public static class BrokerListener extends Thread {
+        public boolean shallRun = true;
+        
+        @Override
+        public void run() {
+            while (shallRun) {
+                if (Data.gridBroker == null) {
+                    try {Thread.sleep(1000);} catch (InterruptedException ee) {}
+                } else try {
+                    MessageContainer<byte[]> mc = Data.gridBroker.receive(YaCyServices.loader.name(), "loader", 10000);
+                    if (mc == null || mc.getPayload() == null) continue;
+                    JSONObject json = new JSONObject(new JSONTokener(new String(mc.getPayload(), StandardCharsets.UTF_8)));
+                    SusiThought process = new SusiThought(json);
+                    List<SusiAction> actions = process.getActions();
+                    if (!actions.isEmpty()) {
+                        SusiAction a = actions.get(0);
+                        String targetasset = a.getStringAttr("targetasset");
+                        if (targetasset != null && targetasset.length() > 0) {
+                            byte[] b = HttpLoader.eval(process, targetasset.endsWith(".gz"));
+                            try {
+                                StorageFactory<byte[]> sf = Data.gridStorage.store(targetasset, b);
+                                Data.logger.info("processed message from queue and stored assed " + targetasset);
+                                
+                                // 
+                                // TODO: trigger follow-up queue here!
+                                //
+                                
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    try {Thread.sleep(1000);} catch (InterruptedException ee) {}
+                }
+            }
+        }
+        public void terminate() {
+            this.shallRun = false;
+        }
+    }
+    
     public static void main(String[] args) {
+        BrokerListener brokerListener = new BrokerListener();
+        brokerListener.start();
         List<Class<? extends Servlet>> services = new ArrayList<>();
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
         Service.runService(SERVICE, DATA_PATH, APP_PATH, services);
+        brokerListener.terminate();
     }
     
 }

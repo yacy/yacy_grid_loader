@@ -32,7 +32,6 @@ import org.json.JSONTokener;
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
-import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.io.assets.StorageFactory;
 import net.yacy.grid.io.messages.MessageContainer;
 import net.yacy.grid.loader.api.LoaderService;
@@ -56,14 +55,14 @@ public class Loader {
     };
     
     /**
-     * broker listener, takes process messages from the queue "loader", "loader"
+     * broker listener, takes process messages from the queue "loader", "webloader"
      * i.e. test with:
      * curl -X POST -F "message=@job.json" -F "serviceName=loader" -F "queueName=loader" http://yacygrid.com:8100/yacy/grid/mcp/messages/send.json
      * where job.json is:
 {
   "metadata": {
     "process": "yacy_grid_loader",
-    "count": 0
+    "count": 1
   },
   "data": [{"collection": "test"}],
   "actions": [{
@@ -71,7 +70,7 @@ public class Loader {
     "collection": "test",
     "targetasset": "test3/yacy.net.warc.gz",
     "type": "loader",
-    "queue": "loader"
+    "queue": "webloader"
   }]
 }
      */
@@ -84,7 +83,7 @@ public class Loader {
                 if (Data.gridBroker == null) {
                     try {Thread.sleep(1000);} catch (InterruptedException ee) {}
                 } else try {
-                    MessageContainer<byte[]> mc = Data.gridBroker.receive(YaCyServices.loader.name(), "loader", 10000);
+                    MessageContainer<byte[]> mc = Data.gridBroker.receive(YaCyServices.loader.name(), "webloader", 10000);
                     if (mc == null || mc.getPayload() == null) continue;
                     JSONObject json = new JSONObject(new JSONTokener(new String(mc.getPayload(), StandardCharsets.UTF_8)));
                     SusiThought process = new SusiThought(json);

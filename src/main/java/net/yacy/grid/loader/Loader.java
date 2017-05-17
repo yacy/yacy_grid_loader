@@ -33,7 +33,6 @@ import org.json.JSONTokener;
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
-import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.io.assets.StorageFactory;
 import net.yacy.grid.io.messages.MessageContainer;
 import net.yacy.grid.loader.api.LoaderService;
@@ -95,7 +94,7 @@ public class Loader {
                 if (Data.gridBroker == null) {
                     try {Thread.sleep(1000);} catch (InterruptedException ee) {}
                 } else try {
-                    MessageContainer<byte[]> mc = Data.gridBroker.receive(YaCyServices.loader.name(), "loader", 10000);
+                    MessageContainer<byte[]> mc = Data.gridBroker.receive(YaCyServices.loader.name(), "webloader", 10000);
                     if (mc == null || mc.getPayload() == null) continue;
                     JSONObject json = new JSONObject(new JSONTokener(new String(mc.getPayload(), StandardCharsets.UTF_8)));
                     SusiThought process = new SusiThought(json);

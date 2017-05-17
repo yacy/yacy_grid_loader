@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import javax.servlet.Servlet;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -56,23 +57,33 @@ public class Loader {
     };
     
     /**
-     * broker listener, takes process messages from the queue "loader", "loader"
+     * broker listener, takes process messages from the queue "loader", "webloader"
      * i.e. test with:
-     * curl -X POST -F "message=@job.json" -F "serviceName=loader" -F "queueName=loader" http://yacygrid.com:8100/yacy/grid/mcp/messages/send.json
+     * curl -X POST -F "message=@job.json" -F "serviceName=loader" -F "queueName=webloader" http://yacygrid.com:8100/yacy/grid/mcp/messages/send.json
      * where job.json is:
 {
   "metadata": {
     "process": "yacy_grid_loader",
-    "count": 0
+    "count": 1
   },
   "data": [{"collection": "test"}],
   "actions": [{
+    "type": "loader",
+    "queue": "webloader",
     "urls": ["http://yacy.net"],
     "collection": "test",
-    "targetasset": "test3/yacy.net.warc.gz",
-    "type": "loader",
-    "queue": "loader"
-  }]
+    "targetasset": "test3/yacy.net.warc.gz"
+  },{
+    "type": "parser",
+    "queue": "yacyparser",
+    "sourceasset": "test3/yacy.net.warc.gz",
+    "targetasset": "test3/yacy.net.jsonlist"
+  },{
+    "type": "indexer",
+    "queue": "elasticsearch",
+    "sourceasset": "test3/yacy.net.jsonlist"
+  },
+  ]
 }
      */
     public static class BrokerListener extends Thread {
@@ -95,13 +106,23 @@ public class Loader {
                         if (targetasset != null && targetasset.length() > 0) {
                             byte[] b = HttpLoader.eval(process, targetasset.endsWith(".gz"));
                             try {
-                                StorageFactory<byte[]> sf = Data.gridStorage.store(targetasset, b);
-                                Data.logger.info("processed message from queue and stored assed " + targetasset);
+                                Data.gridStorage.store(targetasset, b);
+                                Data.logger.info("processed message from queue and stored asset " + targetasset);
                                 
-                                // 
-                                // TODO: trigger follow-up queue here!
-                                //
-                                
+                                // send next action to queue
+                                actions.remove(0);
+                                if (actions.size() > 0) {
+                                    a = actions.get(0);
+                                    String type = a.getStringAttr("type");
+                                    String queue = a.getStringAttr("queue");
+                                    if (type.length() > 0 && queue.length() > 0) {
+                                        // create a new Thought and push it to the next queue
+                                        JSONArray nextActions = new JSONArray();
+                                        actions.forEach(action -> nextActions.put(action.toJSONClone()));
+                                        JSONObject nextProcess = new JSONObject().put("data", process.getData()).put("actions", nextActions);
+                                        Data.gridBroker.send(type, queue, nextProcess.toString().getBytes(StandardCharsets.UTF_8));
+                                    }
+                                }
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }

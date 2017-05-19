@@ -68,7 +68,8 @@ public class HttpLoader {
                     out = new ByteArrayOutputStream();
                 }
                 WarcWriter ww = HttpLoader.initWriter(out, process, compressed);
-                List<String> errors = HttpLoader.load(ww, action.getArrayAttr("urls"));
+                JSONArray urls = action.getArrayAttr("urls");
+                List<String> errors = HttpLoader.load(ww, urls);
                 errors.forEach(u -> Data.logger.debug("Loader - cannot load: " + u));
                 if (out instanceof ByteArrayOutputStream) {
                     byte[] b = ((ByteArrayOutputStream) out).toByteArray();

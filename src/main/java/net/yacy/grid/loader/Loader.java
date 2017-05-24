@@ -143,7 +143,7 @@ public class Loader {
         List<Class<? extends Servlet>> services = new ArrayList<>();
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
-        Service.runService(SERVICE, DATA_PATH, APP_PATH, services);
+        Service.runService(SERVICE, DATA_PATH, APP_PATH, null, services);
         brokerListener.terminate();
     }
     

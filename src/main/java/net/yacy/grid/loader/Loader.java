@@ -70,18 +70,25 @@ public class Loader {
     "queue": "webloader",
     "urls": ["http://yacy.net"],
     "collection": "test",
-    "targetasset": "test3/yacy.net.warc.gz"
-  },{
-    "type": "parser",
-    "queue": "yacyparser",
-    "sourceasset": "test3/yacy.net.warc.gz",
-    "targetasset": "test3/yacy.net.jsonlist"
-  },{
-    "type": "indexer",
-    "queue": "elasticsearch",
-    "sourceasset": "test3/yacy.net.jsonlist"
-  },
-  ]
+    "targetasset": "test3/yacy.net.warc.gz",
+    "actions": [{
+      "type": "parser",
+      "queue": "yacyparser",
+      "sourceasset": "test3/yacy.net.warc.gz",
+      "targetasset": "test3/yacy.net.jsonlist",
+      "targetgraph": "test3/yacy.net.graph.json"
+      "actions": [{
+        "type": "indexer",
+        "queue": "elasticsearch",
+        "sourceasset": "test3/yacy.net.jsonlist"
+      },{
+        "type": "crawler",
+        "queue": "webcrawler",
+        "sourceasset": "test3/yacy.net.graph.json"
+      },
+      ]
+    }]
+  }]
 }
      */
     public static class BrokerListener extends Thread {

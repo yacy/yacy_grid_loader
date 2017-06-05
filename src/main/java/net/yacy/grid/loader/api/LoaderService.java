@@ -54,7 +54,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         SusiThought process = ProcessService.queryToProcess(call);
         
         // construct a WARC
-        byte[] b = HttpLoader.eval(process, true);
+        byte[] b = HttpLoader.eval(process.getActions().get(0), process.getData(), true);
         
         // store the WARC as asset if wanted
         return new ServiceResponse(b);

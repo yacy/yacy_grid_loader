@@ -34,12 +34,10 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.json.JSONArray;
-import org.json.JSONObject;
 import org.jwat.warc.WarcWriter;
 import org.jwat.warc.WarcWriterFactory;
 
 import ai.susi.mind.SusiAction;
-import ai.susi.mind.SusiThought;
 import ai.susi.mind.SusiAction.RenderType;
 import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
@@ -51,52 +49,50 @@ public class HttpLoader {
     private static final AtomicInteger fc = new AtomicInteger(0);
     public final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
     
-    public static byte[] eval(SusiThought process, boolean compressed) {
-        for (SusiAction action : process.getActions()) {
-            if (action.getRenderType() == RenderType.loader) {
-                // construct a WARC
-                String tmpfilename = "yacygridloader-" + millisFormat.format(new Date());
-                tmpfilename += "-" + Integer.toString(fc.incrementAndGet());
-                OutputStream out;
-                File tmp = null;
+    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed) {
+        if (action.getRenderType() == RenderType.loader) {
+            // construct a WARC
+            String tmpfilename = "yacygridloader-" + millisFormat.format(new Date());
+            tmpfilename += "-" + Integer.toString(fc.incrementAndGet());
+            OutputStream out;
+            File tmp = null;
+            try {
+                tmp = File.createTempFile(tmpfilename, ".warc");
+                //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
+                out = new BufferedOutputStream(new FileOutputStream(tmp));
+            } catch (IOException e) {
+                tmp = null;
+                out = new ByteArrayOutputStream();
+            }
+            WarcWriter ww = HttpLoader.initWriter(out, data, compressed);
+            JSONArray urls = action.getArrayAttr("urls");
+            List<String> errors = HttpLoader.load(ww, urls);
+            errors.forEach(u -> Data.logger.debug("Loader - cannot load: " + u));
+            if (out instanceof ByteArrayOutputStream) {
+                byte[] b = ((ByteArrayOutputStream) out).toByteArray();
+                return b;
+            } else {
                 try {
-                    tmp = File.createTempFile(tmpfilename, ".warc");
-                    //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
-                    out = new BufferedOutputStream(new FileOutputStream(tmp));
-                } catch (IOException e) {
-                    tmp = null;
-                    out = new ByteArrayOutputStream();
-                }
-                WarcWriter ww = HttpLoader.initWriter(out, process, compressed);
-                JSONArray urls = action.getArrayAttr("urls");
-                List<String> errors = HttpLoader.load(ww, urls);
-                errors.forEach(u -> Data.logger.debug("Loader - cannot load: " + u));
-                if (out instanceof ByteArrayOutputStream) {
-                    byte[] b = ((ByteArrayOutputStream) out).toByteArray();
+                    out.close();
+                    // open the file again to create a byte[]
+                    byte[] b = Files.readAllBytes(tmp.toPath());
+                    tmp.delete();
+                    if (tmp.exists()) tmp.deleteOnExit();
                     return b;
-                } else {
-                    try {
-                        out.close();
-                        // open the file again to create a byte[]
-                        byte[] b = Files.readAllBytes(tmp.toPath());
-                        tmp.delete();
-                        if (tmp.exists()) tmp.deleteOnExit();
-                        return b;
-                    } catch (IOException e) {
-                        // this should not happen since we had been able to open the file
-                        e.printStackTrace();
-                    }
+                } catch (IOException e) {
+                    // this should not happen since we had been able to open the file
+                    e.printStackTrace();
                 }
             }
         }
         return new byte[0];
     }
     
-    public static WarcWriter initWriter(OutputStream out, JSONObject props, boolean compressed) {
+    public static WarcWriter initWriter(OutputStream out, JSONArray data, boolean compressed) {
         WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
         
         try {
-            JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, props.toString(2).getBytes(StandardCharsets.UTF_8));
+            JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, data.toString(2).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             e.printStackTrace();
         }

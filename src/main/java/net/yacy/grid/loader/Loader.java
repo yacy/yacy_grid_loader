@@ -39,7 +39,7 @@ import net.yacy.grid.mcp.Service;
 
 public class Loader {
 
-    private final static YaCyServices SERVICE = YaCyServices.loader;
+    private final static YaCyServices SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json
     private final static String DATA_PATH = "data";
     private final static String APP_PATH = "loader";
  
@@ -61,7 +61,40 @@ public class Loader {
     "process": "yacy_grid_loader",
     "count": 1
   },
-  "data": [{"collection": "test"}],
+  "data": [{
+    "crawlingMode": "url",
+    "crawlingURL": "http://yacy.net",
+    "sitemapURL": "",
+    "crawlingFile": "",
+    "crawlingDepth": 3,
+    "crawlingDepthExtension": "",
+    "range": "domain",
+    "mustmatch": ".*",
+    "mustnotmatch": "",
+    "ipMustmatch": ".*",
+    "ipMustnotmatch": "",
+    "indexmustmatch": ".*",
+    "indexmustnotmatch": "",
+    "deleteold": "off",
+    "deleteIfOlderNumber": 0,
+    "deleteIfOlderUnit": "day",
+    "recrawl": "nodoubles",
+    "reloadIfOlderNumber": 0,
+    "reloadIfOlderUnit": "day",
+    "crawlingDomMaxCheck": "off",
+    "crawlingDomMaxPages": 1000,
+    "crawlingQ": "off",
+    "directDocByURL": "off",
+    "storeHTCache": "off",
+    "cachePolicy": "if fresh",
+    "indexText": "on",
+    "indexMedia": "off",
+    "xsstopw": "off",
+    "collection": "user",
+    "agentName": "yacybot (yacy.net; crawler from yacygrid.com)",
+    "user": "anonymous@nowhere.com",
+    "client": "yacygrid.com"
+  }],
   "actions": [{
     "type": "loader",
     "queue": "webloader",
@@ -73,7 +106,7 @@ public class Loader {
       "queue": "yacyparser",
       "sourceasset": "test3/yacy.net.warc.gz",
       "targetasset": "test3/yacy.net.jsonlist",
-      "targetgraph": "test3/yacy.net.graph.json"
+      "targetgraph": "test3/yacy.net.graph.json",
       "actions": [{
         "type": "indexer",
         "queue": "elasticsearch",
@@ -82,11 +115,13 @@ public class Loader {
         "type": "crawler",
         "queue": "webcrawler",
         "sourceasset": "test3/yacy.net.graph.json"
-      },
+      }
       ]
     }]
   }]
 }
+     *
+     * to check the queue content, see http://www.searchlab.eu:15672/
      */
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 

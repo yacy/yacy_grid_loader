@@ -22,7 +22,6 @@ package net.yacy.grid.loader;
 import java.io.IOException;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
-import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
@@ -35,6 +34,7 @@ public class HtmlUnitLoader {
     static {
         client = new WebClient(BrowserVersion.CHROME);
         client.getOptions().setJavaScriptEnabled(true);
+        client.getCache().setMaxSize(1000); // this might be a bit large TODO: we must automatically scale here
     }
 
     private String url, xml;
@@ -47,14 +47,21 @@ public class HtmlUnitLoader {
         return this.xml;
     }
 
-    public HtmlUnitLoader(String url) {
+    public HtmlUnitLoader(String url) throws IOException {
         this.url = url;
         HtmlPage page;
         try {
             page = client.getPage(url);
             this.xml = page.asXml();
-        } catch (FailingHttpStatusCodeException | IOException e) {
+        } catch (Throwable e) {
+            // there can be many reasons here, i.e. an error in javascript
+            // we should always treat this as if the error is within the HTMLUnit, not the web page.
+            // Therefore, we should do a fail-over without HTMLUnit
             e.printStackTrace();
+            
+            // load the page with standard client anyway
+            // to do this, we throw an IOException here and the caller must handle this
+            throw new IOException(e.getMessage());
         }
     }
 

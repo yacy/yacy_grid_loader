@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -66,8 +67,8 @@ public class HttpLoader {
             }
             WarcWriter ww = HttpLoader.initWriter(out, data, compressed);
             JSONArray urls = action.getArrayAttr("urls");
-            List<String> errors = HttpLoader.load(ww, urls);
-            errors.forEach(u -> Data.logger.debug("Loader - cannot load: " + u));
+            Map<String, String> errors = HttpLoader.load(ww, urls);
+            errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
             if (out instanceof ByteArrayOutputStream) {
                 byte[] b = ((ByteArrayOutputStream) out).toByteArray();
                 return b;
@@ -112,14 +113,14 @@ public class HttpLoader {
         return errors;
     }
     
-    public static List<String> load(WarcWriter warcWriter, JSONArray urls) {
-        List<String> errors = new ArrayList<>();
+    public static Map<String, String> load(WarcWriter warcWriter, JSONArray urls) {
+        Map<String, String> errors = new LinkedHashMap<>();
         urls.forEach(url -> {
             try {
                 load(warcWriter, (String) url);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 e.printStackTrace();
-                errors.add((String) url);
+                errors.put((String) url, e.getMessage());
             }
         });
         return errors;
@@ -129,7 +130,7 @@ public class HttpLoader {
         Date loaddate = new Date();
         Map<String, List<String>> header = new HashMap<String, List<String>>();
         int statuscode;
-        InputStream inputStream;
+        InputStream inputStream = null;
         CloseableHttpClient httpClient = HttpClients.custom()
                 .useSystemProperties()
                 .setConnectionManager(ClientConnection.getConnctionManager(false))
@@ -137,10 +138,10 @@ public class HttpLoader {
                 .build();
         
         // first do a HEAD request to find the mime type
+        if (url.indexOf("//") < 0) url = "http://" + url;
         HttpRequestBase request = new HttpHead(url);
         request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.yacyInternetCrawlerAgentName).userAgent);
         
-
         HttpResponse httpResponse = null;
         try {
             httpResponse = httpClient.execute(request);
@@ -169,13 +170,21 @@ public class HttpLoader {
         }
         
         // here we know the content type
-        if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml")) {
+        if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml")) try {
             // use htmlunit to load this
             HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url);
             String xml = htmlUnitLoader.getXml();
             inputStream = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
-        } else {
-            // do another http request
+        } catch (IOException e) {
+            // do nothing here, input stream is not set
+            String cause = e.getMessage();
+            if (cause.indexOf("404") >= 0) throw new IOException("" + request.getURI() + " fail: " + cause);
+            Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
+        }
+        
+        if (inputStream == null) {
+            // do another http request. This can either happen because mime type is not html
+            // or it was html and HtmlUnit has failed - we retry the normal way here.
 
             // do a GET request
             request = new HttpGet(url);

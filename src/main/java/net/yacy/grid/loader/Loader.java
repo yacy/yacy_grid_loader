@@ -39,9 +39,8 @@ import net.yacy.grid.mcp.Service;
 
 public class Loader {
 
-    private final static YaCyServices SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json
+    private final static YaCyServices LOADER_SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json
     private final static String DATA_PATH = "data";
-    private final static String APP_PATH = "loader";
  
     // define services
     @SuppressWarnings("unchecked")
@@ -125,6 +124,10 @@ public class Loader {
      */
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 
+        public LoaderListener(YaCyServices service) {
+             super(service, Runtime.getRuntime().availableProcessors());
+        }
+        
         @Override
         public boolean processAction(SusiAction action, JSONArray data) {
             String targetasset = action.getStringAttr("targetasset");
@@ -143,12 +146,18 @@ public class Loader {
     }
     
     public static void main(String[] args) {
-        BrokerListener brokerListener = new LoaderListener();
-        new Thread(brokerListener).start();
+        // initialize environment variables
         List<Class<? extends Servlet>> services = new ArrayList<>();
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
-        Service.runService(SERVICE, DATA_PATH, APP_PATH, null, services);
+        Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH);
+
+        // start listener
+        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE);
+        new Thread(brokerListener).start();
+        
+        // start server
+        Service.runService(null);
         brokerListener.terminate();
     }
     

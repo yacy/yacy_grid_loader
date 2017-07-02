@@ -19,13 +19,14 @@
 
 package net.yacy.grid.loader;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import javax.servlet.Servlet;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import ai.susi.mind.SusiAction;
 import net.yacy.grid.YaCyServices;
@@ -132,14 +133,29 @@ public class Loader {
         public boolean processAction(SusiAction action, JSONArray data) {
             String targetasset = action.getStringAttr("targetasset");
             if (targetasset != null && targetasset.length() > 0) {
-                byte[] b = HttpLoader.eval(action, data, targetasset.endsWith(".gz"));
+                final byte[] b;
+                try {
+                    b = HttpLoader.eval(action, data, targetasset.endsWith(".gz"));
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                    return false;
+                }
+                Data.logger.info("processed message for targetasset " + targetasset);
                 try {
                     Data.gridStorage.store(targetasset, b);
-                    Data.logger.info("processed message from queue and stored asset " + targetasset);
-                    return true;
-                } catch (IOException e) {
+                    Data.logger.info("stored asset " + targetasset);
+                } catch (Throwable e) {
                     e.printStackTrace();
+                    Data.logger.info("asset " + targetasset + " could not be stored, carrying the asset within the next action");
+                    JSONArray actions = action.getEmbeddedActions();
+                    actions.forEach(a -> 
+                        new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
+                    );
+                    // problem solved, while no storage available, we carry this inside the action.
+                    return true;
                 }
+                Data.logger.info("processed message from queue and stored asset " + targetasset);
+                return true;
             }
             return false;
         }

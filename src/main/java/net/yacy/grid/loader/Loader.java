@@ -21,7 +21,6 @@ package net.yacy.grid.loader;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import javax.servlet.Servlet;
 
@@ -141,21 +140,24 @@ public class Loader {
                     return false;
                 }
                 Data.logger.info("processed message for targetasset " + targetasset);
+                boolean storeToMessage = true; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
                     Data.logger.info("stored asset " + targetasset);
                 } catch (Throwable e) {
                     e.printStackTrace();
                     Data.logger.info("asset " + targetasset + " could not be stored, carrying the asset within the next action");
-                    JSONArray actions = action.getEmbeddedActions();
+                    storeToMessage = true;
+                }
+                if (storeToMessage) {
+                	JSONArray actions = action.getEmbeddedActions();
                     actions.forEach(a -> 
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
-                    // problem solved, while no storage available, we carry this inside the action.
-                    return true;
                 }
                 Data.logger.info("processed message from queue and stored asset " + targetasset);
                 return true;
+                
             }
             return false;
         }

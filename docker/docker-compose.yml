@@ -1,0 +1,6 @@
+version: '2'
+services:
+  yacy_grid_loader:
+    build: .
+    ports:
+      - 8200:8200

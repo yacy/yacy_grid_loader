@@ -93,7 +93,7 @@ public class JwatWarcWriter {
      * @param b
      * @return a base32 string for the sha1 of the input
      */
-    private static String sha1(byte[] b) {
+    public static String sha1(byte[] b) {
         try {
             MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
             sha1.reset();

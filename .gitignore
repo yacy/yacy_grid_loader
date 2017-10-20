@@ -1,5 +1,46 @@
+# For project specific ignore rules look at /project/.gitignore
+###############################################################
+
+# IDE and editor specific files #
+#################################
+nbproject
+.idea
+.buildpath
+.project
+.settings
+.tags
+.tags1
+tags
+!.gitkeep
+playbook.retry
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# Vagrant generated files #
+###########################
+.vagrant
+ubuntu-xenial-16.04-cloudimg-console.log
+
+# Provision backup file #
+#########################
+setup/db_dumps/*
+
+# project specific files #
+#########################
 /classes/
 /.gradle/
 /build/
-/bin/
 /data/
+target/
+/class/
+.DS_Store
+.settings

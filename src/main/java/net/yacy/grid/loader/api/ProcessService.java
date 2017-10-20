@@ -33,7 +33,6 @@ import net.yacy.grid.http.APIHandler;
 import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.http.Query;
 import net.yacy.grid.http.ServiceResponse;
-import net.yacy.grid.io.assets.StorageFactory;
 import net.yacy.grid.loader.HttpLoader;
 import net.yacy.grid.mcp.Data;
 
@@ -69,7 +68,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         JSONObject json = new JSONObject(true);
         if (targetasset != null && targetasset.length() > 0) {
             try {
-                StorageFactory<byte[]> sf = Data.gridStorage.store(targetasset, b);
+                Data.gridStorage.store(targetasset, b);
                 json.put(ObjectAPIHandler.SUCCESS_KEY, true);
                 json.put(ObjectAPIHandler.COMMENT_KEY, "asset stored");
             } catch (IOException e) {

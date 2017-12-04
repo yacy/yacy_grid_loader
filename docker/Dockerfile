@@ -22,7 +22,8 @@ ENV GRADLE_HOME=/opt/gradle/gradle-3.4.1
 ENV PATH=$PATH:$GRADLE_HOME/bin
 RUN gradle -v
 
-RUN git clone https://github.com/publicplan/yacy_grid_loader.git --recursive
+#RUN git clone https://github.com/publicplan/yacy_grid_loader.git --recursive
+ADD ./ /yacy_grid_loader
 WORKDIR /yacy_grid_loader
 
 

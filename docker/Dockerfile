@@ -8,7 +8,7 @@ RUN apt-get update --fix-missing
 
 # install debug tools
 RUN apt-get install -y curl
-RUN apt-get install -y dnsutils inetutils-tools inetutils-ping
+RUN apt-get install -y net-tools dnsutils inetutils-tools inetutils-ping
 
 # add packages
 RUN apt-get install -y git openjdk-8-jdk
@@ -30,6 +30,9 @@ RUN gradle -v
 # change workdir
 ADD ./ /yacy_grid_loader
 WORKDIR /yacy_grid_loader
+
+# create log dir
+RUN mkdir -p log
 
 # compile
 RUN gradle build

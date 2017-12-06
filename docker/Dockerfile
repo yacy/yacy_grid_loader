@@ -4,6 +4,7 @@ MAINTAINER publicplan GmbH
 # update
 RUN apt-get update
 RUN apt-get upgrade -y
+RUN apt-get update --fix-missing
 
 # install debug tools
 RUN apt-get install -y curl

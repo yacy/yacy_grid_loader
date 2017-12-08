@@ -7,6 +7,7 @@ RUN apt-get upgrade -y
 RUN apt-get update --fix-missing
 
 # install debug tools
+RUN apt-get install -y vim
 RUN apt-get install -y curl
 RUN apt-get install -y net-tools dnsutils inetutils-tools inetutils-ping
 

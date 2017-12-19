@@ -17,7 +17,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.yacy.grid.loader;
+package net.yacy.grid.loader.retrieval;
 
 import java.io.IOException;
 

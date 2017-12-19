@@ -33,7 +33,7 @@ import net.yacy.grid.http.APIHandler;
 import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.http.Query;
 import net.yacy.grid.http.ServiceResponse;
-import net.yacy.grid.loader.HttpLoader;
+import net.yacy.grid.loader.retrieval.ContentLoader;
 import net.yacy.grid.mcp.Data;
 
 /**
@@ -62,7 +62,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         
         // construct a WARC
         String targetasset = process.getObservation("targetasset");
-        byte[] b = HttpLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"));
+        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"));
         
         // store the WARC as asset if wanted
         JSONObject json = new JSONObject(true);

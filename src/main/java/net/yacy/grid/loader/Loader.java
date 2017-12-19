@@ -31,6 +31,7 @@ import ai.susi.mind.SusiAction;
 import net.yacy.grid.YaCyServices;
 import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
+import net.yacy.grid.loader.retrieval.ContentLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
@@ -134,7 +135,7 @@ public class Loader {
             if (targetasset != null && targetasset.length() > 0) {
                 final byte[] b;
                 try {
-                    b = HttpLoader.eval(action, data, targetasset.endsWith(".gz"));
+                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"));
                 } catch (Throwable e) {
                     e.printStackTrace();
                     return false;

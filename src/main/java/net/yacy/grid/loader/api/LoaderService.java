@@ -26,7 +26,7 @@ import net.yacy.grid.http.APIHandler;
 import net.yacy.grid.http.ObjectAPIHandler;
 import net.yacy.grid.http.Query;
 import net.yacy.grid.http.ServiceResponse;
-import net.yacy.grid.loader.HttpLoader;
+import net.yacy.grid.loader.retrieval.ContentLoader;
 
 /**
  * 
@@ -54,7 +54,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         SusiThought process = ProcessService.queryToProcess(call);
         
         // construct a WARC
-        byte[] b = HttpLoader.eval(process.getActions().get(0), process.getData(), true);
+        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), true);
         
         // store the WARC as asset if wanted
         return new ServiceResponse(b);

@@ -31,6 +31,7 @@ import ai.susi.mind.SusiAction;
 import net.yacy.grid.YaCyServices;
 import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
+import net.yacy.grid.loader.retrieval.ContentLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
@@ -124,8 +125,11 @@ public class Loader {
      */
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 
-        public LoaderListener(YaCyServices service) {
+        private final long throttling;
+        
+        public LoaderListener(YaCyServices service, long throttling) {
              super(service, Runtime.getRuntime().availableProcessors());
+             this.throttling = throttling;
         }
         
         @Override
@@ -134,7 +138,7 @@ public class Loader {
             if (targetasset != null && targetasset.length() > 0) {
                 final byte[] b;
                 try {
-                    b = HttpLoader.eval(action, data, targetasset.endsWith(".gz"));
+                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"));
                 } catch (Throwable e) {
                     e.printStackTrace();
                     return false;
@@ -156,9 +160,18 @@ public class Loader {
                     );
                 }
                 Data.logger.info("processed message from queue and stored asset " + targetasset);
-                return true;
                 
+                // throttle
+                if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
+
+                // success (has done something)
+                return true;
             }
+
+            // throttle twice
+            if (this.throttling > 0) try {Thread.sleep(2 * this.throttling);} catch (InterruptedException e) {}
+
+            // fail (nothing done)
             return false;
         }
     }
@@ -171,7 +184,8 @@ public class Loader {
         Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH);
 
         // start listener
-        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE);
+        long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
+        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling);
         new Thread(brokerListener).start();
         
         // start server

@@ -1,4 +1,4 @@
-package net.yacy.grid.loader;
+package net.yacy.grid.loader.retrieval;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -32,6 +32,7 @@ import org.apache.http.RequestLine;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.json.JSONArray;
@@ -42,9 +43,10 @@ import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiAction.RenderType;
 import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
+import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.Data;
 
-public class HttpLoader {
+public class ContentLoader {
     
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
     private static final AtomicInteger fc = new AtomicInteger(0);
@@ -65,9 +67,9 @@ public class HttpLoader {
                 tmp = null;
                 out = new ByteArrayOutputStream();
             }
-            WarcWriter ww = HttpLoader.initWriter(out, data, compressed);
+            WarcWriter ww = ContentLoader.initWriter(out, data, compressed);
             JSONArray urls = action.getArrayAttr("urls");
-            Map<String, String> errors = HttpLoader.load(ww, urls);
+            Map<String, String> errors = ContentLoader.load(ww, urls);
             errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
             if (out instanceof ByteArrayOutputStream) {
                 byte[] b = ((ByteArrayOutputStream) out).toByteArray();
@@ -125,22 +127,34 @@ public class HttpLoader {
         });
         return errors;
     }
-    
+
     public static void load(WarcWriter warcWriter, String url) throws IOException {
+        if (url.indexOf("//") < 0) url = "http://" + url;
+        if (url.startsWith("http")) loadHTTP(warcWriter, url);
+        else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
+        else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+    }
+
+    private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {
+        
+    }
+    
+    private static void loadSMB(WarcWriter warcWriter, String url) throws IOException {
+        
+    }
+    
+    private static void loadHTTP(WarcWriter warcWriter, String url) throws IOException {
         Date loaddate = new Date();
-        Map<String, List<String>> header = new HashMap<String, List<String>>();
-        int statuscode;
-        InputStream inputStream = null;
+        
+        // first do a HEAD request to find the mime type
         CloseableHttpClient httpClient = HttpClients.custom()
                 .useSystemProperties()
                 .setConnectionManager(ClientConnection.getConnctionManager(false))
                 .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
                 .build();
         
-        // first do a HEAD request to find the mime type
-        if (url.indexOf("//") < 0) url = "http://" + url;
         HttpRequestBase request = new HttpHead(url);
-        request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.yacyInternetCrawlerAgentName).userAgent);
+        request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.browserAgentName/*.yacyInternetCrawlerAgentName*/).userAgent);
         
         HttpResponse httpResponse = null;
         try {
@@ -148,15 +162,20 @@ public class HttpLoader {
         } catch (UnknownHostException e) {
             request.releaseConnection();
             throw new IOException("client connection failed: unknown host " + request.getURI().getHost());
-        } catch (SocketTimeoutException e){
+        } catch (SocketTimeoutException e) {
             request.releaseConnection();
             throw new IOException("client connection timeout for request: " + request.getURI());
-        } catch (SSLHandshakeException e){
+        } catch (SSLHandshakeException e) {
             request.releaseConnection();
             throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
+        } catch (HttpHostConnectException e) {
+            request.releaseConnection();
+            throw new IOException("client connection refused for request " + request.getURI() + ": " + e.getMessage());
         }
-        statuscode = httpResponse.getStatusLine().getStatusCode();
+
+        int statuscode = httpResponse.getStatusLine().getStatusCode();
         String mime = "";
+        Map<String, List<String>> header = new HashMap<String, List<String>>();
         if (statuscode == 200) {
             for (Header h: httpResponse.getAllHeaders()) {
                 List<String> vals = header.get(h.getName());
@@ -170,6 +189,7 @@ public class HttpLoader {
         }
         
         // here we know the content type
+        InputStream inputStream = null;
         if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml")) try {
             // use htmlunit to load this
             HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url);
@@ -252,7 +272,6 @@ public class HttpLoader {
         int c;
         while ((c = inputStream.read(b)) > 0) r.write(b, 0, c);
         JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, r.toByteArray());
-        
     }
     
 }

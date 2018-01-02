@@ -140,7 +140,7 @@ public class Loader {
                 try {
                     b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"));
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Data.logger.warn("", e);
                     return false;
                 }
                 Data.logger.info("processed message for targetasset " + targetasset);
@@ -149,15 +149,15 @@ public class Loader {
                     Data.gridStorage.store(targetasset, b);
                     Data.logger.info("stored asset " + targetasset);
                 } catch (Throwable e) {
-                    e.printStackTrace();
-                    Data.logger.info("asset " + targetasset + " could not be stored, carrying the asset within the next action");
+                    Data.logger.warn("asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
                     storeToMessage = true;
                 }
                 if (storeToMessage) {
-                	JSONArray actions = action.getEmbeddedActions();
+                    JSONArray actions = action.getEmbeddedActions();
                     actions.forEach(a -> 
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
+                    Data.logger.info("stored asset " + targetasset + " into message");
                 }
                 Data.logger.info("processed message from queue and stored asset " + targetasset);
                 

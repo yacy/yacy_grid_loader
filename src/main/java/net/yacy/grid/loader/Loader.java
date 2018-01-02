@@ -144,7 +144,7 @@ public class Loader {
                     return false;
                 }
                 Data.logger.info("processed message for targetasset " + targetasset);
-                boolean storeToMessage = true; // debug version for now: always true TODO: set to false later
+                boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
                     Data.logger.info("stored asset " + targetasset);

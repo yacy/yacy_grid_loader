@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import javax.servlet.Servlet;
 
+import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -182,6 +183,7 @@ public class Loader {
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
         Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH);
+        Data.logger.getLoggerRepository().setThreshold(Level.INFO);
 
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;

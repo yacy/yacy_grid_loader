@@ -25,6 +25,9 @@ import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
+import net.yacy.grid.mcp.Data;
+import net.yacy.grid.tools.Memory;
+
 /**
  * http://htmlunit.sourceforge.net/
  */
@@ -34,7 +37,7 @@ public class HtmlUnitLoader {
     static {
         client = new WebClient(BrowserVersion.CHROME);
         client.getOptions().setJavaScriptEnabled(true);
-        client.getCache().setMaxSize(1000); // this might be a bit large TODO: we must automatically scale here
+        client.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
     }
 
     private String url, xml;
@@ -51,13 +54,17 @@ public class HtmlUnitLoader {
         this.url = url;
         HtmlPage page;
         try {
+            long mem0 = Memory.available();
             page = client.getPage(url);
             this.xml = page.asXml();
+            long mem1 = Memory.available();
+            if (Memory.shortStatus()) client.getCache().clear();
+            Data.logger.info("HtmlUnitLoader loaded " + url + "; used " + (mem1 - mem0) + " bytes");
         } catch (Throwable e) {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
-            e.printStackTrace();
+            Data.logger.warn("", e);
             
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this

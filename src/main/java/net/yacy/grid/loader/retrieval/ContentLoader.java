@@ -13,6 +13,9 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -23,18 +26,31 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLSession;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.RequestLine;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.HttpHostConnectException;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.json.JSONArray;
 import org.jwat.warc.WarcWriter;
 import org.jwat.warc.WarcWriterFactory;
@@ -45,6 +61,8 @@ import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.Data;
+import net.yacy.grid.tools.Classification.ContentDomain;
+import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
     
@@ -121,7 +139,7 @@ public class ContentLoader {
             try {
                 load(warcWriter, (String) url);
             } catch (Throwable e) {
-                e.printStackTrace();
+                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage(), e);
                 errors.put((String) url, e.getMessage());
             }
         });
@@ -149,14 +167,15 @@ public class ContentLoader {
         // first do a HEAD request to find the mime type
         CloseableHttpClient httpClient = HttpClients.custom()
                 .useSystemProperties()
-                .setConnectionManager(ClientConnection.getConnctionManager(false))
+                .setConnectionManager(getConnctionManager())
+                .setMaxConnPerRoute(200)
+                .setMaxConnTotal(500)
                 .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
                 .build();
         
-        HttpRequestBase request = new HttpHead(url);
-        request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.browserAgentName/*.yacyInternetCrawlerAgentName*/).userAgent);
-        
         HttpResponse httpResponse = null;
+        HttpRequestBase request = new HttpHead(url);
+        request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent);
         try {
             httpResponse = httpClient.execute(request);
         } catch (UnknownHostException e) {
@@ -164,16 +183,16 @@ public class ContentLoader {
             throw new IOException("client connection failed: unknown host " + request.getURI().getHost());
         } catch (SocketTimeoutException e) {
             request.releaseConnection();
-            throw new IOException("client connection timeout for request: " + request.getURI());
+            //throw new IOException("client connection timeout for request: " + request.getURI());
         } catch (SSLHandshakeException e) {
             request.releaseConnection();
-            throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
+            //throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
         } catch (HttpHostConnectException e) {
             request.releaseConnection();
-            throw new IOException("client connection refused for request " + request.getURI() + ": " + e.getMessage());
+            //throw new IOException("client connection refused for request " + request.getURI() + ": " + e.getMessage());
         }
-
-        int statuscode = httpResponse.getStatusLine().getStatusCode();
+        
+        int statuscode = httpResponse == null ? -1 : httpResponse.getStatusLine().getStatusCode();
         String mime = "";
         Map<String, List<String>> header = new HashMap<String, List<String>>();
         if (statuscode == 200) {
@@ -183,19 +202,17 @@ public class ContentLoader {
                 vals.add(h.getValue());
                 if (h.getName().equals("Content-Type")) mime = h.getValue();
             }
-        } else {
-            request.releaseConnection();
-            throw new IOException("client connection to " + request.getURI() + " fail: " + httpResponse.getStatusLine().getReasonPhrase());
         }
         
         // here we know the content type
         InputStream inputStream = null;
-        if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml")) try {
+        MultiProtocolURL u = new MultiProtocolURL(url);
+        if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT) try {
             // use htmlunit to load this
             HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url);
             String xml = htmlUnitLoader.getXml();
             inputStream = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
+        } catch (Throwable e) {
             // do nothing here, input stream is not set
             String cause = e.getMessage();
             if (cause.indexOf("404") >= 0) throw new IOException("" + request.getURI() + " fail: " + cause);
@@ -208,7 +225,7 @@ public class ContentLoader {
 
             // do a GET request
             request = new HttpGet(url);
-            request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.yacyInternetCrawlerAgentName).userAgent);
+            request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent);
             
             try {
                 httpResponse = httpClient.execute(request);
@@ -221,6 +238,9 @@ public class ContentLoader {
             } catch (SSLHandshakeException e){
                 request.releaseConnection();
                 throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
+            } catch (HttpHostConnectException e){
+                request.releaseConnection();
+                throw new IOException("client connection refused for domain " + request.getURI().getHost() + ": " + e.getMessage());
             }
             statuscode = httpResponse.getStatusLine().getStatusCode();
             
@@ -273,5 +293,44 @@ public class ContentLoader {
         while ((c = inputStream.read(b)) > 0) r.write(b, 0, c);
         JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, r.toByteArray());
     }
-    
+
+    /**
+     * get a connection manager
+     * @param trustAllCerts allow opportunistic encryption if needed
+     * @return
+     */
+    private static HttpClientConnectionManager getConnctionManager() {
+
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = null;
+        try {
+            SSLConnectionSocketFactory trustSelfSignedSocketFactory = new SSLConnectionSocketFactory(
+                        new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build(),
+                        new TrustAllHostNameVerifier());
+            socketFactoryRegistry = RegistryBuilder
+                    .<ConnectionSocketFactory> create()
+                    .register("http", new PlainConnectionSocketFactory())
+                    .register("https", trustSelfSignedSocketFactory)
+                    .build();
+        } catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException e) {
+            Data.logger.warn("", e);
+        }
+
+        PoolingHttpClientConnectionManager cm = (socketFactoryRegistry != null) ?
+                new PoolingHttpClientConnectionManager(socketFactoryRegistry):
+                new PoolingHttpClientConnectionManager();
+
+        // twitter specific options
+        cm.setMaxTotal(200);
+        cm.setDefaultMaxPerRoute(20);
+        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 80)), 50);
+        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 443)), 50);
+        
+        return cm;
+    }
+    private static class TrustAllHostNameVerifier implements HostnameVerifier {
+        public boolean verify(String hostname, SSLSession session) {
+            return true;
+        }
+    }
+
 }

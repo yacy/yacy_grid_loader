@@ -84,7 +84,7 @@ public class ContentLoader {
                     return b;
                 } catch (IOException e) {
                     // this should not happen since we had been able to open the file
-                    e.printStackTrace();
+                    Data.logger.warn("", e);
                 }
             }
         }

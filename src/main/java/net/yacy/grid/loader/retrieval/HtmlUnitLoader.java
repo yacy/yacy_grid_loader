@@ -49,6 +49,9 @@ public class HtmlUnitLoader {
         WebClientOptions options = client.getOptions();
         options.setJavaScriptEnabled(true);
         options.setCssEnabled(false);
+        options.setPopupBlockerEnabled(true);
+        options.setRedirectEnabled(true);
+        options.setThrowExceptionOnScriptError(false);
         client.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
     }
     
@@ -69,9 +72,9 @@ public class HtmlUnitLoader {
             long mem0 = Memory.available();
             URL uurl = UrlUtils.toUrlUnsafe(url);
             String htmlAcceptHeader = client.getBrowserVersion().getHtmlAcceptHeader();
-            WebWindow webWindow = client.openWindow(uurl, url);
+            WebWindow webWindow = client.openWindow(uurl, "_blank"); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader);
-            page = client.getPage(webWindow, webRequest);
+            page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
             if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
             long mem1 = Memory.available();
@@ -80,12 +83,12 @@ public class HtmlUnitLoader {
                 client.close();
                 initClient();
             }
-            Data.logger.info("HtmlUnitLoader loaded " + url + "; used " + (mem1 - mem0) + " bytes");
+            Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes");
         } catch (Throwable e) {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
-            Data.logger.warn("", e);
+            Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
             
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this

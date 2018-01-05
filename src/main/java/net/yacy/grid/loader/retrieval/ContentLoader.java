@@ -32,7 +32,6 @@ import javax.net.ssl.SSLSession;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.RequestLine;
 import org.apache.http.client.methods.HttpGet;
@@ -42,7 +41,6 @@ import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.conn.routing.HttpRoute;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -51,6 +49,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.jwat.warc.WarcWriter;
 import org.jwat.warc.WarcWriterFactory;
@@ -163,8 +162,8 @@ public class ContentLoader {
     private final static CloseableHttpClient httpClient = HttpClients.custom()
             .useSystemProperties()
             .setConnectionManager(getConnctionManager())
-            .setMaxConnPerRoute(200)
-            .setMaxConnTotal(500)
+            .setMaxConnPerRoute(2000)
+            .setMaxConnTotal(3000)
             .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
             .build();
     
@@ -178,17 +177,17 @@ public class ContentLoader {
         try {
             httpResponse = httpClient.execute(request);
         } catch (UnknownHostException e) {
-            request.releaseConnection();
             throw new IOException("client connection failed: unknown host " + request.getURI().getHost());
         } catch (SocketTimeoutException e) {
-            request.releaseConnection();
             //throw new IOException("client connection timeout for request: " + request.getURI());
         } catch (SSLHandshakeException e) {
-            request.releaseConnection();
             //throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
         } catch (HttpHostConnectException e) {
-            request.releaseConnection();
             //throw new IOException("client connection refused for request " + request.getURI() + ": " + e.getMessage());
+        } catch (Throwable e) {
+        } finally {
+            if (httpResponse != null) EntityUtils.consumeQuietly(httpResponse.getEntity());
+            request.releaseConnection();
         }
         
         int statuscode = httpResponse == null ? -1 : httpResponse.getStatusLine().getStatusCode();
@@ -213,8 +212,8 @@ public class ContentLoader {
             inputStream = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
         } catch (Throwable e) {
             // do nothing here, input stream is not set
-            String cause = e.getMessage();
-            if (cause.indexOf("404") >= 0) throw new IOException("" + request.getURI() + " fail: " + cause);
+            String cause = e == null ? "null" : e.getMessage();
+            if (cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
         
@@ -249,7 +248,6 @@ public class ContentLoader {
                     try {
                         inputStream = new BufferedInputStream(httpEntity.getContent());
                     } catch (IOException e) {
-                        request.releaseConnection();
                         throw e;
                     }
                     for (Header h: httpResponse.getAllHeaders()) {
@@ -257,13 +255,15 @@ public class ContentLoader {
                         if (vals == null) { vals = new ArrayList<String>(); header.put(h.getName(), vals); }
                         vals.add(h.getValue());
                     }
+                    Data.logger.info("ContentLoader loaded " + url);
                 } else {
+                    EntityUtils.consumeQuietly(httpEntity);
                     request.releaseConnection();
-                    throw new IOException("client connection to " + request.getURI() + " fail: " + httpResponse.getStatusLine().getReasonPhrase());
+                    throw new IOException("client connection to " + url + " fail: " + httpResponse.getStatusLine().getReasonPhrase());
                 }
             } else {
                 request.releaseConnection();
-                throw new IOException("client connection to " + request.getURI() + " fail: no connection");
+                throw new IOException("client connection to " + url + " fail: no connection");
             }
         }
         // compute the request
@@ -290,7 +290,11 @@ public class ContentLoader {
         byte[] b = new byte[1024];
         int c;
         while ((c = inputStream.read(b)) > 0) r.write(b, 0, c);
-        JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, r.toByteArray());
+
+        request.releaseConnection();
+        byte[] content = r.toByteArray();
+        Data.logger.info("ContentLoader writing WARC for " + url + " - " + content.length + " bytes");
+        JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, content);
     }
 
     /**
@@ -319,10 +323,8 @@ public class ContentLoader {
                 new PoolingHttpClientConnectionManager();
 
         // twitter specific options
-        cm.setMaxTotal(200);
-        cm.setDefaultMaxPerRoute(20);
-        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 80)), 50);
-        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 443)), 50);
+        cm.setMaxTotal(2000);
+        cm.setDefaultMaxPerRoute(200);
         
         return cm;
     }

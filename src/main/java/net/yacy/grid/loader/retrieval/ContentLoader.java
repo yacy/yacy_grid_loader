@@ -213,7 +213,7 @@ public class ContentLoader {
         } catch (Throwable e) {
             // do nothing here, input stream is not set
             String cause = e == null ? "null" : e.getMessage();
-            if (cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
+            if (cause != null && cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
         
@@ -335,8 +335,9 @@ public class ContentLoader {
     }
 
     public static void main(String[] args) {
+        Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
         List<String> urls = new ArrayList<>();
-        urls.add("http://yacy.net");
+        urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
         byte[] warc = load(urls, "Test".getBytes(), false);
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }

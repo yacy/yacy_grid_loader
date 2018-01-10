@@ -38,6 +38,7 @@ import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
+import net.yacy.grid.tools.GitTool;
 
 public class Loader {
 
@@ -191,6 +192,8 @@ public class Loader {
         new Thread(brokerListener).start();
         
         // start server
+        Data.logger.info("started Loader");
+        Data.logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();
     }

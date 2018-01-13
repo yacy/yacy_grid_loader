@@ -20,10 +20,16 @@
 package net.yacy.grid.loader.retrieval;
 
 import java.io.IOException;
+import java.net.URL;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.TopLevelWindow;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.WebClientOptions;
+import com.gargoylesoftware.htmlunit.WebRequest;
+import com.gargoylesoftware.htmlunit.WebWindow;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.util.UrlUtils;
 
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Memory;
@@ -35,11 +41,20 @@ public class HtmlUnitLoader {
 
     private static WebClient client;
     static {
+        initClient();
+    }
+    
+    private static void initClient() {
         client = new WebClient(BrowserVersion.CHROME);
-        client.getOptions().setJavaScriptEnabled(true);
+        WebClientOptions options = client.getOptions();
+        options.setJavaScriptEnabled(true);
+        options.setCssEnabled(false);
+        options.setPopupBlockerEnabled(true);
+        options.setRedirectEnabled(true);
+        options.setThrowExceptionOnScriptError(false);
         client.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
     }
-
+    
     private String url, xml;
 
     public String getUrl() {
@@ -55,16 +70,25 @@ public class HtmlUnitLoader {
         HtmlPage page;
         try {
             long mem0 = Memory.available();
-            page = client.getPage(url);
+            URL uurl = UrlUtils.toUrlUnsafe(url);
+            String htmlAcceptHeader = client.getBrowserVersion().getHtmlAcceptHeader();
+            WebWindow webWindow = client.openWindow(uurl, "_blank"); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
+            WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader);
+            page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
+            if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
             long mem1 = Memory.available();
             if (Memory.shortStatus()) client.getCache().clear();
-            Data.logger.info("HtmlUnitLoader loaded " + url + "; used " + (mem1 - mem0) + " bytes");
+            if (Memory.shortStatus()) {
+                client.close();
+                initClient();
+            }
+            Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes");
         } catch (Throwable e) {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
-            Data.logger.warn("", e);
+            Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
             
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this

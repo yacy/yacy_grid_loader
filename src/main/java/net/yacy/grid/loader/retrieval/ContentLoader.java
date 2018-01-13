@@ -24,7 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLHandshakeException;
@@ -32,7 +32,6 @@ import javax.net.ssl.SSLSession;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.RequestLine;
 import org.apache.http.client.methods.HttpGet;
@@ -42,7 +41,6 @@ import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.conn.routing.HttpRoute;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -51,6 +49,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.jwat.warc.WarcWriter;
 import org.jwat.warc.WarcWriterFactory;
@@ -67,77 +66,76 @@ import net.yacy.grid.tools.MultiProtocolURL;
 public class ContentLoader {
     
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
-    private static final AtomicInteger fc = new AtomicInteger(0);
-    public final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
     
     public static byte[] eval(SusiAction action, JSONArray data, boolean compressed) {
-        if (action.getRenderType() == RenderType.loader) {
-            // construct a WARC
-            String tmpfilename = "yacygridloader-" + millisFormat.format(new Date());
-            tmpfilename += "-" + Integer.toString(fc.incrementAndGet());
-            OutputStream out;
-            File tmp = null;
-            try {
-                tmp = File.createTempFile(tmpfilename, ".warc");
-                //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
-                out = new BufferedOutputStream(new FileOutputStream(tmp));
-            } catch (IOException e) {
-                tmp = null;
-                out = new ByteArrayOutputStream();
-            }
-            WarcWriter ww = ContentLoader.initWriter(out, data, compressed);
-            JSONArray urls = action.getArrayAttr("urls");
-            Map<String, String> errors = ContentLoader.load(ww, urls);
-            errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
-            if (out instanceof ByteArrayOutputStream) {
-                byte[] b = ((ByteArrayOutputStream) out).toByteArray();
-                return b;
-            } else {
-                try {
-                    out.close();
-                    // open the file again to create a byte[]
-                    byte[] b = Files.readAllBytes(tmp.toPath());
-                    tmp.delete();
-                    if (tmp.exists()) tmp.deleteOnExit();
-                    return b;
-                } catch (IOException e) {
-                    // this should not happen since we had been able to open the file
-                    Data.logger.warn("", e);
-                }
-            }
-        }
-        return new byte[0];
-    }
-    
-    public static WarcWriter initWriter(OutputStream out, JSONArray data, boolean compressed) {
-        WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
+        // this must have a loader action
+        if (action.getRenderType() != RenderType.loader) return new byte[0];
         
-        try {
-            JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, data.toString(2).getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return ww;
+        // extract urls
+        JSONArray urls = action.getArrayAttr("urls");
+        List<String> urlss = new ArrayList<>();
+        urls.forEach(u -> urlss.add(((String) u)));
+        byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
+        return load(urlss, payload, compressed);
     }
 
-    public static List<String> load(WarcWriter warcWriter, List<String> urls) {
-        List<String> errors = new ArrayList<>();
-        urls.forEach(url -> {
+    public static byte[] load(List<String> urls, byte[] header, boolean compressed) {
+        // construct a WARC
+        OutputStream out;
+        File tmp = null;
+        try {
+            tmp = createTempFile("yacygridloader", ".warc");
+            //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
+            out = new BufferedOutputStream(new FileOutputStream(tmp));
+        } catch (IOException e) {
+            tmp = null;
+            out = new ByteArrayOutputStream();
+        }
+        try {
+            WarcWriter ww = ContentLoader.initWriter(out, header, compressed);
+            Map<String, String> errors = ContentLoader.load(ww, urls);
+            errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
+        } catch (IOException e) {
+            Data.logger.warn("ContentLoader.load cannot init WarcWriter", e);
+        }
+        if (out instanceof ByteArrayOutputStream) {
+            byte[] b = ((ByteArrayOutputStream) out).toByteArray();
+            return b;
+        } else {
             try {
-                load(warcWriter, url);
+                out.close();
+                // open the file again to create a byte[]
+                byte[] b = Files.readAllBytes(tmp.toPath());
+                tmp.delete();
+                if (tmp.exists()) tmp.deleteOnExit();
+                return b;
             } catch (IOException e) {
-                e.printStackTrace();
-                errors.add(url);
+                // this should not happen since we had been able to open the file
+                Data.logger.warn("", e);
+                return new byte[0];
             }
-        });
-        return errors;
+        }
     }
     
-    public static Map<String, String> load(WarcWriter warcWriter, JSONArray urls) {
+    private final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
+    private final static AtomicLong createTempFileCounter = new AtomicLong(0);
+    public static File createTempFile(String prefix, String suffix) throws IOException {
+        String tmpprefix = prefix + "-" + millisFormat.format(new Date()) + Long.toString(createTempFileCounter.getAndIncrement());
+        File tmp = File.createTempFile(tmpprefix, suffix);
+        return tmp;
+    }
+    
+    private static WarcWriter initWriter(OutputStream out, byte[] payload, boolean compressed) throws IOException {
+        WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
+        JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, payload);
+        return ww;
+    }
+    
+    public static Map<String, String> load(WarcWriter warcWriter, List<String> urls) {
         Map<String, String> errors = new LinkedHashMap<>();
         urls.forEach(url -> {
             try {
-                load(warcWriter, (String) url);
+                load(warcWriter, url);
             } catch (Throwable e) {
                 Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage(), e);
                 errors.put((String) url, e.getMessage());
@@ -161,35 +159,35 @@ public class ContentLoader {
         
     }
     
+    private final static CloseableHttpClient httpClient = HttpClients.custom()
+            .useSystemProperties()
+            .setConnectionManager(getConnctionManager())
+            .setMaxConnPerRoute(2000)
+            .setMaxConnTotal(3000)
+            .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
+            .build();
+    
     private static void loadHTTP(WarcWriter warcWriter, String url) throws IOException {
         Date loaddate = new Date();
         
         // first do a HEAD request to find the mime type
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .useSystemProperties()
-                .setConnectionManager(getConnctionManager())
-                .setMaxConnPerRoute(200)
-                .setMaxConnTotal(500)
-                .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
-                .build();
-        
         HttpResponse httpResponse = null;
         HttpRequestBase request = new HttpHead(url);
         request.setHeader("User-Agent", ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent);
         try {
             httpResponse = httpClient.execute(request);
         } catch (UnknownHostException e) {
-            request.releaseConnection();
             throw new IOException("client connection failed: unknown host " + request.getURI().getHost());
         } catch (SocketTimeoutException e) {
-            request.releaseConnection();
             //throw new IOException("client connection timeout for request: " + request.getURI());
         } catch (SSLHandshakeException e) {
-            request.releaseConnection();
             //throw new IOException("client connection handshake error for domain " + request.getURI().getHost() + ": " + e.getMessage());
         } catch (HttpHostConnectException e) {
-            request.releaseConnection();
             //throw new IOException("client connection refused for request " + request.getURI() + ": " + e.getMessage());
+        } catch (Throwable e) {
+        } finally {
+            if (httpResponse != null) EntityUtils.consumeQuietly(httpResponse.getEntity());
+            request.releaseConnection();
         }
         
         int statuscode = httpResponse == null ? -1 : httpResponse.getStatusLine().getStatusCode();
@@ -214,8 +212,8 @@ public class ContentLoader {
             inputStream = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
         } catch (Throwable e) {
             // do nothing here, input stream is not set
-            String cause = e.getMessage();
-            if (cause.indexOf("404") >= 0) throw new IOException("" + request.getURI() + " fail: " + cause);
+            String cause = e == null ? "null" : e.getMessage();
+            if (cause != null && cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
         
@@ -250,7 +248,6 @@ public class ContentLoader {
                     try {
                         inputStream = new BufferedInputStream(httpEntity.getContent());
                     } catch (IOException e) {
-                        request.releaseConnection();
                         throw e;
                     }
                     for (Header h: httpResponse.getAllHeaders()) {
@@ -258,13 +255,15 @@ public class ContentLoader {
                         if (vals == null) { vals = new ArrayList<String>(); header.put(h.getName(), vals); }
                         vals.add(h.getValue());
                     }
+                    Data.logger.info("ContentLoader loaded " + url);
                 } else {
+                    EntityUtils.consumeQuietly(httpEntity);
                     request.releaseConnection();
-                    throw new IOException("client connection to " + request.getURI() + " fail: " + httpResponse.getStatusLine().getReasonPhrase());
+                    throw new IOException("client connection to " + url + " fail: " + httpResponse.getStatusLine().getReasonPhrase());
                 }
             } else {
                 request.releaseConnection();
-                throw new IOException("client connection to " + request.getURI() + " fail: no connection");
+                throw new IOException("client connection to " + url + " fail: no connection");
             }
         }
         // compute the request
@@ -291,7 +290,11 @@ public class ContentLoader {
         byte[] b = new byte[1024];
         int c;
         while ((c = inputStream.read(b)) > 0) r.write(b, 0, c);
-        JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, r.toByteArray());
+
+        request.releaseConnection();
+        byte[] content = r.toByteArray();
+        Data.logger.info("ContentLoader writing WARC for " + url + " - " + content.length + " bytes");
+        JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, content);
     }
 
     /**
@@ -320,10 +323,8 @@ public class ContentLoader {
                 new PoolingHttpClientConnectionManager();
 
         // twitter specific options
-        cm.setMaxTotal(200);
-        cm.setDefaultMaxPerRoute(20);
-        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 80)), 50);
-        cm.setMaxPerRoute(new HttpRoute(new HttpHost("twitter.com", 443)), 50);
+        cm.setMaxTotal(2000);
+        cm.setDefaultMaxPerRoute(200);
         
         return cm;
     }
@@ -333,4 +334,12 @@ public class ContentLoader {
         }
     }
 
+    public static void main(String[] args) {
+        Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
+        List<String> urls = new ArrayList<>();
+        urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
+        byte[] warc = load(urls, "Test".getBytes(), false);
+        System.out.println(new String(warc, StandardCharsets.UTF_8));
+    }
+    
 }

@@ -21,6 +21,9 @@ package net.yacy.grid.loader.api;
 
 import javax.servlet.http.HttpServletResponse;
 
+import org.json.JSONArray;
+
+import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
 import net.yacy.grid.http.APIHandler;
 import net.yacy.grid.http.ObjectAPIHandler;
@@ -53,8 +56,12 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         // construct the same process as if it was submitted on a queue
         SusiThought process = ProcessService.queryToProcess(call);
         
+        // extract call parameter here to enhance ability to debug
+        SusiAction action = process.getActions().get(0);
+        JSONArray data = process.getData();
+
         // construct a WARC
-        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), true);
+        byte[] b = ContentLoader.eval(action, data, true);
         
         // store the WARC as asset if wanted
         return new ServiceResponse(b);

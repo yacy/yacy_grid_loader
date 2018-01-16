@@ -65,7 +65,12 @@ public class HtmlUnitLoader {
         return this.xml;
     }
 
-    public HtmlUnitLoader(String url) throws IOException {
+    public HtmlUnitLoader(String url) throws IOException {// check short memory status
+        if (Memory.shortStatus()) {
+            client.getCache().clear();
+            client.close();
+            initClient();
+        }
         this.url = url;
         HtmlPage page;
         try {

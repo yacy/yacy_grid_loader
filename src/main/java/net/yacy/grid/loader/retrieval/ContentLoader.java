@@ -1,3 +1,22 @@
+/**
+ *  ContentLoader
+ *  Copyright 11.5.2017 by Michael Peter Christen, @0rb1t3r
+ *
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 2.1 of the License, or (at your option) any later version.
+ *  
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ *  
+ *  You should have received a copy of the GNU Lesser General Public License
+ *  along with this program in the file lgpl21.txt
+ *  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package net.yacy.grid.loader.retrieval;
 
 import java.io.BufferedInputStream;
@@ -61,6 +80,7 @@ import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Classification.ContentDomain;
+import net.yacy.grid.tools.Memory;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
@@ -159,15 +179,24 @@ public class ContentLoader {
         
     }
     
-    private final static CloseableHttpClient httpClient = HttpClients.custom()
-            .useSystemProperties()
-            .setConnectionManager(getConnctionManager())
-            .setMaxConnPerRoute(2000)
-            .setMaxConnTotal(3000)
-            .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
-            .build();
+    private static CloseableHttpClient httpClient;
+    private static void init() {
+        httpClient = HttpClients.custom()
+                .useSystemProperties()
+                .setConnectionManager(getConnctionManager())
+                .setMaxConnPerRoute(2000)
+                .setMaxConnTotal(3000)
+                .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
+                .build();
+    }
+    static {
+        init();
+    }
     
-    private static void loadHTTP(WarcWriter warcWriter, String url) throws IOException {
+    private static void loadHTTP(WarcWriter warcWriter, String url) throws IOException {// check short memory status
+        if (Memory.shortStatus()) {
+            init();
+        }
         Date loaddate = new Date();
         
         // first do a HEAD request to find the mime type

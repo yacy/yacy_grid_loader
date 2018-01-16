@@ -87,7 +87,7 @@ public class ContentLoader {
     
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
     
-    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed) {
+    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix) {
         // this must have a loader action
         if (action.getRenderType() != RenderType.loader) return new byte[0];
         
@@ -96,10 +96,12 @@ public class ContentLoader {
         List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
         byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
-        return load(urlss, payload, compressed);
+        return load(urlss, payload, compressed, threadnameprefix);
     }
 
-    public static byte[] load(List<String> urls, byte[] header, boolean compressed) {
+    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix) {
+        Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
+        
         // construct a WARC
         OutputStream out;
         File tmp = null;
@@ -367,7 +369,7 @@ public class ContentLoader {
         Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
         List<String> urls = new ArrayList<>();
         urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
-        byte[] warc = load(urls, "Test".getBytes(), false);
+        byte[] warc = load(urls, "Test".getBytes(), false, "test");
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }
     

@@ -135,12 +135,15 @@ public class Loader {
         }
         
         @Override
-        public boolean processAction(SusiAction action, JSONArray data) {
+        public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
+
             String targetasset = action.getStringAttr("targetasset");
+            String threadnameprefix = processName + "-" + processNumber;
+            Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
             if (targetasset != null && targetasset.length() > 0) {
                 final byte[] b;
                 try {
-                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"));
+                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"), threadnameprefix);
                 } catch (Throwable e) {
                     Data.logger.warn("", e);
                     return false;

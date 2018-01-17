@@ -87,7 +87,7 @@ public class ContentLoader {
     
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
     
-    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed) {
+    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix) {
         // this must have a loader action
         if (action.getRenderType() != RenderType.loader) return new byte[0];
         
@@ -96,10 +96,12 @@ public class ContentLoader {
         List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
         byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
-        return load(urlss, payload, compressed);
+        return load(urlss, payload, compressed, threadnameprefix);
     }
 
-    public static byte[] load(List<String> urls, byte[] header, boolean compressed) {
+    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix) {
+        Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
+        
         // construct a WARC
         OutputStream out;
         File tmp = null;
@@ -113,7 +115,7 @@ public class ContentLoader {
         }
         try {
             WarcWriter ww = ContentLoader.initWriter(out, header, compressed);
-            Map<String, String> errors = ContentLoader.load(ww, urls);
+            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix);
             errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
         } catch (IOException e) {
             Data.logger.warn("ContentLoader.load cannot init WarcWriter", e);
@@ -151,11 +153,11 @@ public class ContentLoader {
         return ww;
     }
     
-    public static Map<String, String> load(WarcWriter warcWriter, List<String> urls) {
+    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName) {
         Map<String, String> errors = new LinkedHashMap<>();
         urls.forEach(url -> {
             try {
-                load(warcWriter, url);
+                load(warcWriter, url, threadName);
             } catch (Throwable e) {
                 Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage(), e);
                 errors.put((String) url, e.getMessage());
@@ -164,9 +166,9 @@ public class ContentLoader {
         return errors;
     }
 
-    public static void load(WarcWriter warcWriter, String url) throws IOException {
+    public static void load(final WarcWriter warcWriter, String url, final String threadName) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
-        if (url.startsWith("http")) loadHTTP(warcWriter, url);
+        if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName);
         else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
         else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
     }
@@ -193,7 +195,7 @@ public class ContentLoader {
         init();
     }
     
-    private static void loadHTTP(WarcWriter warcWriter, String url) throws IOException {// check short memory status
+    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName) throws IOException {// check short memory status
         if (Memory.shortStatus()) {
             init();
         }
@@ -236,7 +238,7 @@ public class ContentLoader {
         MultiProtocolURL u = new MultiProtocolURL(url);
         if (mime.endsWith("/html") || mime.endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT) try {
             // use htmlunit to load this
-            HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url);
+            HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
             String xml = htmlUnitLoader.getXml();
             inputStream = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
         } catch (Throwable e) {
@@ -367,7 +369,7 @@ public class ContentLoader {
         Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
         List<String> urls = new ArrayList<>();
         urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
-        byte[] warc = load(urls, "Test".getBytes(), false);
+        byte[] warc = load(urls, "Test".getBytes(), false, "test");
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }
     

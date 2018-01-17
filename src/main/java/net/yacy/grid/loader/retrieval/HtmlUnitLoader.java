@@ -21,6 +21,7 @@ package net.yacy.grid.loader.retrieval;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.TopLevelWindow;
@@ -39,20 +40,32 @@ import net.yacy.grid.tools.Memory;
  */
 public class HtmlUnitLoader {
 
-    private static WebClient client;
+    private static WebClient clientx = null;
+    private static AtomicLong webClientUsage = new AtomicLong(1);
     static {
         initClient();
     }
     
     private static void initClient() {
-        client = new WebClient(BrowserVersion.CHROME);
-        WebClientOptions options = client.getOptions();
+        if (clientx != null) {
+            clientx.getCache().clear();
+        	clientx.close();
+        }
+        clientx = new WebClient(BrowserVersion.CHROME);
+        WebClientOptions options = clientx.getOptions();
         options.setJavaScriptEnabled(true);
         options.setCssEnabled(false);
         options.setPopupBlockerEnabled(true);
         options.setRedirectEnabled(true);
         options.setThrowExceptionOnScriptError(false);
-        client.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
+        clientx.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
+    }
+    
+    public static WebClient getClient() {
+    	if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
+    		initClient();
+    	}
+    	return clientx;
     }
     
     private String url, xml;
@@ -65,22 +78,20 @@ public class HtmlUnitLoader {
         return this.xml;
     }
 
-    public HtmlUnitLoader(String url) throws IOException {// check short memory status
-        if (Memory.shortStatus()) {
-            client.getCache().clear();
-            client.close();
-            initClient();
-        }
+    public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status
+        
+        WebClient client = getClient();
         this.url = url;
         HtmlPage page;
         try {
             long mem0 = Memory.available();
             URL uurl = UrlUtils.toUrlUnsafe(url);
             String htmlAcceptHeader = client.getBrowserVersion().getHtmlAcceptHeader();
-            WebWindow webWindow = client.openWindow(uurl, "_blank"); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
+            WebWindow webWindow = client.openWindow(uurl, windowName); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader);
             page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
+            webWindow.getEnclosedPage().cleanUp();
             if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
             long mem1 = Memory.available();
             if (Memory.shortStatus()) client.getCache().clear();

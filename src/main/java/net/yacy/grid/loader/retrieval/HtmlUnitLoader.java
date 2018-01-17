@@ -39,12 +39,13 @@ import net.yacy.grid.tools.Memory;
  */
 public class HtmlUnitLoader {
 
-    private static WebClient client;
+    private static WebClient client = null;
     static {
         initClient();
     }
     
     public static void initClient() {
+        if (client != null) client.close();
         client = new WebClient(BrowserVersion.CHROME);
         WebClientOptions options = client.getOptions();
         options.setJavaScriptEnabled(true);

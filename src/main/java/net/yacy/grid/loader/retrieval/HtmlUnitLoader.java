@@ -44,7 +44,7 @@ public class HtmlUnitLoader {
         initClient();
     }
     
-    private static void initClient() {
+    public static void initClient() {
         client = new WebClient(BrowserVersion.CHROME);
         WebClientOptions options = client.getOptions();
         options.setJavaScriptEnabled(true);

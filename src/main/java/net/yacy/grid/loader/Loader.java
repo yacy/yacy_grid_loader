@@ -33,14 +33,12 @@ import net.yacy.grid.YaCyServices;
 import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
 import net.yacy.grid.loader.retrieval.ContentLoader;
-import net.yacy.grid.loader.retrieval.HtmlUnitLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.GitTool;
-import net.yacy.grid.tools.Memory;
 
 public class Loader {
 
@@ -139,12 +137,6 @@ public class Loader {
         @Override
         public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
 
-            // check short memory status
-            if (Memory.shortStatus()) {
-                HtmlUnitLoader.initClient(); // the WebClient holds a lot of resource bundles
-            }
-            
-            
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
             Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);

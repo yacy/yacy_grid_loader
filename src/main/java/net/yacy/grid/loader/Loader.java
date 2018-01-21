@@ -148,13 +148,13 @@ public class Loader {
                     Data.logger.warn("", e);
                     return false;
                 }
-                Data.logger.info("processed message for targetasset " + targetasset);
+                Data.logger.info("Loder.processActoion processed message for targetasset " + targetasset);
                 boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
-                    Data.logger.info("stored asset " + targetasset);
+                    Data.logger.info("Loder.processActoion stored asset " + targetasset);
                 } catch (Throwable e) {
-                    Data.logger.warn("asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
+                    Data.logger.warn("Loder.processActoion asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
                     storeToMessage = true;
                 }
                 if (storeToMessage) {
@@ -162,9 +162,9 @@ public class Loader {
                     actions.forEach(a -> 
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
-                    Data.logger.info("stored asset " + targetasset + " into message");
+                    Data.logger.info("Loder.processActoion stored asset " + targetasset + " into message");
                 }
-                Data.logger.info("processed message from queue and stored asset " + targetasset);
+                Data.logger.info("Loder.processActoion processed message from queue and stored asset " + targetasset);
                 
                 // throttle
                 if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
@@ -195,7 +195,7 @@ public class Loader {
         new Thread(brokerListener).start();
         
         // start server
-        Data.logger.info("started Loader");
+        Data.logger.info("Loder.main started Loader");
         Data.logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();

@@ -21,6 +21,7 @@ package net.yacy.grid.loader.retrieval;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
@@ -49,7 +50,7 @@ public class HtmlUnitLoader {
     private static void initClient() {
         if (clientx != null) {
             clientx.getCache().clear();
-        	clientx.close();
+            clientx.close();
         }
         clientx = new WebClient(BrowserVersion.CHROME);
         WebClientOptions options = clientx.getOptions();
@@ -62,10 +63,10 @@ public class HtmlUnitLoader {
     }
     
     public static WebClient getClient() {
-    	if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
-    		initClient();
-    	}
-    	return clientx;
+        if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
+            initClient();
+        }
+        return clientx;
     }
     
     private String url, xml;
@@ -79,8 +80,21 @@ public class HtmlUnitLoader {
     }
 
     public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status
-        
+
         WebClient client = getClient();
+        
+        List<WebWindow> wwlist = client.getWebWindows();
+        //Data.logger.info("\nvvv");
+        Data.logger.info("HtmlUnitLoader open windows: " + wwlist.size());
+        for (WebWindow webWindow: wwlist) {
+            //Data.logger.info("HtmlUnitLoader window open: " + webWindow.getName());
+            if (!webWindow.getName().startsWith("webloader")) {
+                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
+                client.deregisterWebWindow(webWindow);
+            }
+        }
+        //Data.logger.info("^^^\n");
+        
         this.url = url;
         HtmlPage page;
         try {
@@ -93,6 +107,7 @@ public class HtmlUnitLoader {
             this.xml = page.asXml();
             webWindow.getEnclosedPage().cleanUp();
             if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
+            client.deregisterWebWindow(webWindow);
             long mem1 = Memory.available();
             if (Memory.shortStatus()) client.getCache().clear();
             if (Memory.shortStatus()) {

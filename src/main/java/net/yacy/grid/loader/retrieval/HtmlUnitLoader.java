@@ -22,9 +22,11 @@ package net.yacy.grid.loader.retrieval;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.BrowserVersion.BrowserVersionBuilder;
 import com.gargoylesoftware.htmlunit.TopLevelWindow;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebClientOptions;
@@ -41,18 +43,21 @@ import net.yacy.grid.tools.Memory;
  */
 public class HtmlUnitLoader {
 
+    private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
     private static WebClient clientx = null;
     private static AtomicLong webClientUsage = new AtomicLong(1);
+    
     static {
-        initClient();
+        initClient(userAgentDefault);
     }
     
-    private static void initClient() {
+    public static void initClient(String userAgent) {
+        userAgentDefault = userAgent;
         if (clientx != null) {
             clientx.getCache().clear();
             clientx.close();
         }
-        clientx = new WebClient(BrowserVersion.CHROME);
+        clientx = new WebClient(getBrowser(userAgent));
         WebClientOptions options = clientx.getOptions();
         options.setJavaScriptEnabled(true);
         options.setCssEnabled(false);
@@ -64,9 +69,21 @@ public class HtmlUnitLoader {
     
     public static WebClient getClient() {
         if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
-            initClient();
+            initClient(userAgentDefault);
         }
         return clientx;
+    }
+
+    public static BrowserVersion getBrowser(String userAgent) {
+        BrowserVersionBuilder browserBuilder = getBrowserBuilder();
+        browserBuilder.setUserAgent(userAgent);
+        return browserBuilder.build();
+    }
+    
+    public static BrowserVersionBuilder getBrowserBuilder() {
+        BrowserVersionBuilder browserBuilder = new BrowserVersion.BrowserVersionBuilder(BrowserVersion.CHROME);
+        browserBuilder.setSystemTimezone(TimeZone.getDefault());
+        return browserBuilder;
     }
     
     private String url, xml;
@@ -112,7 +129,7 @@ public class HtmlUnitLoader {
             if (Memory.shortStatus()) client.getCache().clear();
             if (Memory.shortStatus()) {
                 client.close();
-                initClient();
+                initClient(userAgentDefault);
             }
             Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes");
         } catch (Throwable e) {

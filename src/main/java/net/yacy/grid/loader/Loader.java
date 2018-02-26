@@ -30,9 +30,12 @@ import org.json.JSONObject;
 
 import ai.susi.mind.SusiAction;
 import net.yacy.grid.YaCyServices;
+import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
+import net.yacy.grid.loader.retrieval.ApacheHttpClient;
 import net.yacy.grid.loader.retrieval.ContentLoader;
+import net.yacy.grid.loader.retrieval.HtmlUnitLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
@@ -189,6 +192,16 @@ public class Loader {
         Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH);
         Data.logger.getLoggerRepository().setThreshold(Level.INFO);
 
+        // initialize loader with user agent
+        String userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent;
+        String userAgentType = Data.config.get("grid.lodeer.userAgentType");
+        if ("CUSTOM".equals(userAgentType)) userAgent = Data.config.get("grid.lodeer.userAgentName");
+        if ("YACY".equals(userAgentType)) userAgent = ClientIdentification.yacyInternetCrawlerAgent.userAgent;
+        if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
+        if ("BROWSER".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
+        ApacheHttpClient.initClient(userAgent);
+        HtmlUnitLoader.initClient(userAgent);
+        
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
         BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling);

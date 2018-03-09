@@ -20,16 +20,11 @@
 package net.yacy.grid.loader.retrieval;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -50,9 +45,12 @@ import com.gargoylesoftware.htmlunit.BrowserVersion;
 
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiAction.RenderType;
+import net.yacy.grid.io.index.CrawlerDocument;
+import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Classification.ContentDomain;
+import net.yacy.grid.tools.Digest;
 import net.yacy.grid.tools.Memory;
 import net.yacy.grid.tools.MultiProtocolURL;
 
@@ -140,9 +138,41 @@ public class ContentLoader {
 
     public static void load(final WarcWriter warcWriter, String url, final String threadName) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
-        if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName);
-        else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
-        else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+        
+
+        // load entry from crawler index
+        String urlid = Digest.encodeMD5Hex(url);
+        CrawlerDocument crawlerDocument = null;
+        try {
+            crawlerDocument = CrawlerDocument.load(Data.gridIndex, urlid);
+        } catch (IOException e) {
+            // could not load the crawler document which is strange. It should be there
+            
+        }
+
+        long t = System.currentTimeMillis();
+        try {
+            if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName);
+            else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
+            else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+            
+            // write success status
+            if (crawlerDocument != null) {
+                long load_time = System.currentTimeMillis() - t;
+                crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
+                crawlerDocument.store(Data.gridIndex, urlid);
+                // check with http://localhost:9200/crawler/_search?q=status_s:loaded
+            }
+        } catch (IOException e) {
+            // write fail status
+            if (crawlerDocument != null) {
+                long load_time = System.currentTimeMillis() - t;
+                crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
+                crawlerDocument.store(Data.gridIndex, urlid);
+                // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
+            }
+            throw e;
+        }
     }
 
     private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {

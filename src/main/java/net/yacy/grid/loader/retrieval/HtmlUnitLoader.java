@@ -173,7 +173,7 @@ public class HtmlUnitLoader {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
-            Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
+            // Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
             
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this

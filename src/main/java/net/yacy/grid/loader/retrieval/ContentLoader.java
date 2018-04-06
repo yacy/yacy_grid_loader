@@ -129,7 +129,7 @@ public class ContentLoader {
             try {
                 load(warcWriter, url, threadName);
             } catch (Throwable e) {
-                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage(), e);
+                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
                 errors.put((String) url, e.getMessage());
             }
         });
@@ -147,7 +147,6 @@ public class ContentLoader {
             crawlerDocument = CrawlerDocument.load(Data.gridIndex, urlid);
         } catch (IOException e) {
             // could not load the crawler document which is strange. It should be there
-            
         }
 
         long t = System.currentTimeMillis();
@@ -208,7 +207,9 @@ public class ContentLoader {
         } catch (Throwable e) {
             // do nothing here, input stream is not set
             String cause = e == null ? "null" : e.getMessage();
-            if (cause != null && cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
+            if (cause != null && cause.indexOf("404") >= 0) {
+                throw new IOException("" + url + " fail: " + cause);
+            }
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
         
@@ -233,7 +234,7 @@ public class ContentLoader {
     }
     
     public static void main(String[] args) {
-        Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
+        Data.init(new File("data/mcp-8100"), new HashMap<String, String>(), false);
         List<String> urls = new ArrayList<>();
         urls.add("https://krefeld.polizei.nrw/");
         //urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");

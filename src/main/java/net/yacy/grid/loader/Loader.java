@@ -29,6 +29,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import ai.susi.mind.SusiAction;
+import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
 import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.loader.api.LoaderService;
@@ -89,12 +90,7 @@ public class Loader {
     "crawlingDomMaxCheck": "off",
     "crawlingDomMaxPages": 1000,
     "crawlingQ": "off",
-    "directDocByURL": "off",
-    "storeHTCache": "off",
     "cachePolicy": "if fresh",
-    "indexText": "on",
-    "indexMedia": "off",
-    "xsstopw": "off",
     "collection": "user",
     "agentName": "yacybot (yacy.net; crawler from yacygrid.com)",
     "user": "anonymous@nowhere.com",
@@ -140,13 +136,21 @@ public class Loader {
         @Override
         public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
 
+            // find out if we should do headless loading
+            String crawlID = action.getStringAttr("id");
+            boolean loaderHeadless = true;
+            if (crawlID != null && crawlID.length() > 0) {
+                JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+                loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
+            }
+            
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
             Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
             if (targetasset != null && targetasset.length() > 0) {
                 final byte[] b;
                 try {
-                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"), threadnameprefix);
+                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"), threadnameprefix, loaderHeadless);
                 } catch (Throwable e) {
                     Data.logger.warn("", e);
                     return false;

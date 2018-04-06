@@ -57,7 +57,7 @@ import net.yacy.grid.tools.MultiProtocolURL;
 public class ContentLoader {
     
     
-    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix) {
+    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
         // this must have a loader action
         if (action.getRenderType() != RenderType.loader) return new byte[0];
         
@@ -66,10 +66,10 @@ public class ContentLoader {
         List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
         byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
-        return load(urlss, payload, compressed, threadnameprefix);
+        return load(urlss, payload, compressed, threadnameprefix, useHeadlessLoader);
     }
 
-    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix) {
+    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
         Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
         
         // construct a WARC
@@ -85,7 +85,7 @@ public class ContentLoader {
         }
         try {
             WarcWriter ww = ContentLoader.initWriter(out, header, compressed);
-            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix);
+            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix, useHeadlessLoader);
             errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
         } catch (IOException e) {
             Data.logger.warn("ContentLoader.load cannot init WarcWriter", e);
@@ -123,11 +123,11 @@ public class ContentLoader {
         return ww;
     }
     
-    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName) {
+    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) {
         Map<String, String> errors = new LinkedHashMap<>();
         urls.forEach(url -> {
             try {
-                load(warcWriter, url, threadName);
+                load(warcWriter, url, threadName, useHeadlessLoader);
             } catch (Throwable e) {
                 Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
                 errors.put((String) url, e.getMessage());
@@ -136,7 +136,7 @@ public class ContentLoader {
         return errors;
     }
 
-    public static void load(final WarcWriter warcWriter, String url, final String threadName) throws IOException {
+    public static void load(final WarcWriter warcWriter, String url, final String threadName, final boolean useHeadlessLoader) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
         
 
@@ -151,7 +151,7 @@ public class ContentLoader {
 
         long t = System.currentTimeMillis();
         try {
-            if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName);
+            if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
             else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
             else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
             
@@ -187,7 +187,7 @@ public class ContentLoader {
         ApacheHttpClient.initClient(userAgentDefault);
     }
     
-    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName) throws IOException {// check short memory status
+    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
         if (Memory.shortStatus()) {
             ApacheHttpClient.initClient(userAgentDefault);
         }
@@ -199,7 +199,7 @@ public class ContentLoader {
         // here we know the content type
         byte[] content = null;
         MultiProtocolURL u = new MultiProtocolURL(url);
-        if (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT) try {
+        if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {
             // use htmlunit to load this
             HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
             String xml = htmlUnitLoader.getXml();
@@ -238,7 +238,7 @@ public class ContentLoader {
         List<String> urls = new ArrayList<>();
         urls.add("https://krefeld.polizei.nrw/");
         //urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
-        byte[] warc = load(urls, "Test".getBytes(), false, "test");
+        byte[] warc = load(urls, "Test".getBytes(), false, "test", true);
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }
     

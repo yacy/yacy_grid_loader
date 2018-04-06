@@ -73,6 +73,9 @@ public class HtmlUnitLoader {
         options.setPopupBlockerEnabled(true);
         options.setRedirectEnabled(true);
         options.setThrowExceptionOnScriptError(false);
+        options.setDownloadImages(false);
+        options.setGeolocationEnabled(false);
+        options.setPrintContentOnFailingStatusCode(false);
         webClient.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
         webClient.setIncorrectnessListener(new IncorrectnessListener() {
             @Override

@@ -189,7 +189,7 @@ public class Loader {
         List<Class<? extends Servlet>> services = new ArrayList<>();
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
-        Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH);
+        Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH, false);
         Data.logger.getLoggerRepository().setThreshold(Level.INFO);
 
         // initialize loader with user agent

@@ -20,19 +20,28 @@
 package net.yacy.grid.loader.retrieval;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.w3c.css.sac.CSSException;
+import org.w3c.css.sac.CSSParseException;
+import org.w3c.css.sac.ErrorHandler;
+
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.BrowserVersion.BrowserVersionBuilder;
+import com.gargoylesoftware.htmlunit.IncorrectnessListener;
+import com.gargoylesoftware.htmlunit.ScriptException;
 import com.gargoylesoftware.htmlunit.TopLevelWindow;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebClientOptions;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.WebWindow;
+import com.gargoylesoftware.htmlunit.html.HTMLParserListener;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.javascript.JavaScriptErrorListener;
 import com.gargoylesoftware.htmlunit.util.UrlUtils;
 
 import net.yacy.grid.mcp.Data;
@@ -44,7 +53,7 @@ import net.yacy.grid.tools.Memory;
 public class HtmlUnitLoader {
 
     private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
-    private static WebClient clientx = null;
+    private static WebClient webClient = null;
     private static AtomicLong webClientUsage = new AtomicLong(1);
     
     static {
@@ -53,25 +62,56 @@ public class HtmlUnitLoader {
     
     public static void initClient(String userAgent) {
         userAgentDefault = userAgent;
-        if (clientx != null) {
-            clientx.getCache().clear();
-            clientx.close();
+        if (webClient != null) {
+            webClient.getCache().clear();
+            webClient.close();
         }
-        clientx = new WebClient(getBrowser(userAgent));
-        WebClientOptions options = clientx.getOptions();
+        webClient = new WebClient(getBrowser(userAgent));
+        WebClientOptions options = webClient.getOptions();
         options.setJavaScriptEnabled(true);
         options.setCssEnabled(false);
         options.setPopupBlockerEnabled(true);
         options.setRedirectEnabled(true);
         options.setThrowExceptionOnScriptError(false);
-        clientx.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
+        options.setDownloadImages(false);
+        options.setGeolocationEnabled(false);
+        options.setPrintContentOnFailingStatusCode(false);
+        webClient.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
+        webClient.setIncorrectnessListener(new IncorrectnessListener() {
+            @Override
+            public void notify(String arg0, Object arg1) {}
+        });
+        webClient.setCssErrorHandler(new ErrorHandler() {
+            @Override
+            public void warning(CSSParseException exception) throws CSSException {}
+            @Override
+            public void fatalError(CSSParseException exception) throws CSSException {}
+            @Override
+            public void error(CSSParseException exception) throws CSSException {}
+        });
+        webClient.setJavaScriptErrorListener(new JavaScriptErrorListener() {
+            @Override
+            public void timeoutError(HtmlPage arg0, long arg1, long arg2) {}
+            @Override
+            public void scriptException(HtmlPage arg0, ScriptException arg1) {}
+            @Override
+            public void malformedScriptURL(HtmlPage arg0, String arg1, MalformedURLException arg2) {}
+            @Override
+            public void loadScriptError(HtmlPage arg0, URL arg1, Exception arg2) {}
+        });
+        webClient.setHTMLParserListener(new HTMLParserListener() {
+            @Override
+            public void error(String message, URL url, String html, int line, int column, String key) {}
+            @Override
+            public void warning(String message, URL url, String html, int line, int column, String key) {}
+        });
     }
     
     public static WebClient getClient() {
         if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
             initClient(userAgentDefault);
         }
-        return clientx;
+        return webClient;
     }
 
     public static BrowserVersion getBrowser(String userAgent) {
@@ -136,7 +176,7 @@ public class HtmlUnitLoader {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
-            Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
+            // Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
             
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this

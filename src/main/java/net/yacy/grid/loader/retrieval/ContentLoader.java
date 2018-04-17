@@ -20,16 +20,11 @@
 package net.yacy.grid.loader.retrieval;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -50,16 +45,19 @@ import com.gargoylesoftware.htmlunit.BrowserVersion;
 
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiAction.RenderType;
+import net.yacy.grid.io.index.CrawlerDocument;
+import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Classification.ContentDomain;
+import net.yacy.grid.tools.Digest;
 import net.yacy.grid.tools.Memory;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
     
     
-    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix) {
+    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
         // this must have a loader action
         if (action.getRenderType() != RenderType.loader) return new byte[0];
         
@@ -68,10 +66,10 @@ public class ContentLoader {
         List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
         byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
-        return load(urlss, payload, compressed, threadnameprefix);
+        return load(urlss, payload, compressed, threadnameprefix, useHeadlessLoader);
     }
 
-    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix) {
+    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
         Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
         
         // construct a WARC
@@ -87,7 +85,7 @@ public class ContentLoader {
         }
         try {
             WarcWriter ww = ContentLoader.initWriter(out, header, compressed);
-            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix);
+            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix, useHeadlessLoader);
             errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
         } catch (IOException e) {
             Data.logger.warn("ContentLoader.load cannot init WarcWriter", e);
@@ -125,24 +123,55 @@ public class ContentLoader {
         return ww;
     }
     
-    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName) {
+    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) {
         Map<String, String> errors = new LinkedHashMap<>();
         urls.forEach(url -> {
             try {
-                load(warcWriter, url, threadName);
+                load(warcWriter, url, threadName, useHeadlessLoader);
             } catch (Throwable e) {
-                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage(), e);
+                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
                 errors.put((String) url, e.getMessage());
             }
         });
         return errors;
     }
 
-    public static void load(final WarcWriter warcWriter, String url, final String threadName) throws IOException {
+    public static void load(final WarcWriter warcWriter, String url, final String threadName, final boolean useHeadlessLoader) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
-        if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName);
-        else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
-        else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+        
+
+        // load entry from crawler index
+        String urlid = Digest.encodeMD5Hex(url);
+        CrawlerDocument crawlerDocument = null;
+        try {
+            crawlerDocument = CrawlerDocument.load(Data.gridIndex, urlid);
+        } catch (IOException e) {
+            // could not load the crawler document which is strange. It should be there
+        }
+
+        long t = System.currentTimeMillis();
+        try {
+            if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
+            else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
+            else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+            
+            // write success status
+            if (crawlerDocument != null) {
+                long load_time = System.currentTimeMillis() - t;
+                crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
+                crawlerDocument.store(Data.gridIndex, urlid);
+                // check with http://localhost:9200/crawler/_search?q=status_s:loaded
+            }
+        } catch (IOException e) {
+            // write fail status
+            if (crawlerDocument != null) {
+                long load_time = System.currentTimeMillis() - t;
+                crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
+                crawlerDocument.store(Data.gridIndex, urlid);
+                // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
+            }
+            throw e;
+        }
     }
 
     private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {
@@ -158,7 +187,7 @@ public class ContentLoader {
         ApacheHttpClient.initClient(userAgentDefault);
     }
     
-    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName) throws IOException {// check short memory status
+    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
         if (Memory.shortStatus()) {
             ApacheHttpClient.initClient(userAgentDefault);
         }
@@ -170,7 +199,7 @@ public class ContentLoader {
         // here we know the content type
         byte[] content = null;
         MultiProtocolURL u = new MultiProtocolURL(url);
-        if (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT) try {
+        if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {
             // use htmlunit to load this
             HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
             String xml = htmlUnitLoader.getXml();
@@ -178,7 +207,9 @@ public class ContentLoader {
         } catch (Throwable e) {
             // do nothing here, input stream is not set
             String cause = e == null ? "null" : e.getMessage();
-            if (cause != null && cause.indexOf("404") >= 0) throw new IOException("" + url + " fail: " + cause);
+            if (cause != null && cause.indexOf("404") >= 0) {
+                throw new IOException("" + url + " fail: " + cause);
+            }
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
         
@@ -203,11 +234,11 @@ public class ContentLoader {
     }
     
     public static void main(String[] args) {
-        Data.init(new File("data/mcp-8100"), new HashMap<String, String>());
+        Data.init(new File("data/mcp-8100"), new HashMap<String, String>(), false);
         List<String> urls = new ArrayList<>();
         urls.add("https://krefeld.polizei.nrw/");
         //urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
-        byte[] warc = load(urls, "Test".getBytes(), false, "test");
+        byte[] warc = load(urls, "Test".getBytes(), false, "test", true);
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }
     

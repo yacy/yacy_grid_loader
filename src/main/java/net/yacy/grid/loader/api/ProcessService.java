@@ -62,7 +62,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         
         // construct a WARC
         String targetasset = process.getObservation("targetasset");
-        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost());
+        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost(), true);
         
         // store the WARC as asset if wanted
         JSONObject json = new JSONObject(true);

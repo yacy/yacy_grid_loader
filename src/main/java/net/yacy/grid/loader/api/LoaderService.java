@@ -61,7 +61,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         JSONArray data = process.getData();
 
         // construct a WARC
-        byte[] b = ContentLoader.eval(action, data, true, "api call from " + call.getClientHost());
+        byte[] b = ContentLoader.eval(action, data, true, "api call from " + call.getClientHost(), true);
         
         // store the WARC as asset if wanted
         return new ServiceResponse(b);

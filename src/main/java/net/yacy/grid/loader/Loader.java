@@ -44,6 +44,13 @@ import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.GitTool;
 
+/**
+ * The Loader main class
+ * 
+ * performance debugging:
+ * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt
+ * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt?count=100 *
+ */
 public class Loader {
 
     private final static YaCyServices LOADER_SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json

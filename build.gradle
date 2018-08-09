@@ -44,6 +44,6 @@ dependencies {
     compile group: 'org.elasticsearch.client', name: 'transport', version: '5.+'
     compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '4.10.0.201712302008-r'
 
-    compile group: 'org.jwat', name: 'jwat-warc', version: '1.1.0'
-    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.29'
+    compile group: 'org.jwat', name: 'jwat-warc', version: '1.1.1'
+    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.32'
 }

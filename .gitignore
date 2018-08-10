@@ -36,11 +36,17 @@ setup/db_dumps/*
 
 # project specific files #
 #########################
-/classes/
+classes/
+target/
+data/
+/class/
 /.gradle/
 /build/
-/data/
-target/
-/class/
 .DS_Store
 .settings
+.idea/
+bin/ai/
+bin/log4j.properties
+bin/net/
+bin/org/
+/bin/

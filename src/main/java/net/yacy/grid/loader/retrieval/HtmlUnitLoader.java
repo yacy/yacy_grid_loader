@@ -26,10 +26,9 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.w3c.css.sac.CSSException;
-import org.w3c.css.sac.CSSParseException;
-import org.w3c.css.sac.ErrorHandler;
-
+import com.gargoylesoftware.css.parser.CSSException;
+import com.gargoylesoftware.css.parser.CSSParseException;
+import com.gargoylesoftware.css.parser.CSSErrorHandler;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.BrowserVersion.BrowserVersionBuilder;
 import com.gargoylesoftware.htmlunit.IncorrectnessListener;
@@ -72,22 +71,22 @@ public class HtmlUnitLoader {
         options.setCssEnabled(false);
         options.setPopupBlockerEnabled(true);
         options.setRedirectEnabled(true);
-        options.setThrowExceptionOnScriptError(false);
         options.setDownloadImages(false);
         options.setGeolocationEnabled(false);
         options.setPrintContentOnFailingStatusCode(false);
+        options.setThrowExceptionOnScriptError(false);
         webClient.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
         webClient.setIncorrectnessListener(new IncorrectnessListener() {
             @Override
             public void notify(String arg0, Object arg1) {}
         });
-        webClient.setCssErrorHandler(new ErrorHandler() {
+        webClient.setCssErrorHandler(new CSSErrorHandler() {
             @Override
             public void warning(CSSParseException exception) throws CSSException {}
             @Override
-            public void fatalError(CSSParseException exception) throws CSSException {}
-            @Override
             public void error(CSSParseException exception) throws CSSException {}
+            @Override
+            public void fatalError(CSSParseException exception) throws CSSException {}
         });
         webClient.setJavaScriptErrorListener(new JavaScriptErrorListener() {
             @Override

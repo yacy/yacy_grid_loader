@@ -46,3 +46,5 @@ data/
 .settings
 .idea/
 
+config-loader.properties
+log4j.properties

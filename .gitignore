@@ -45,8 +45,4 @@ data/
 .DS_Store
 .settings
 .idea/
-bin/ai/
-bin/log4j.properties
-bin/net/
-bin/org/
-/bin/
+

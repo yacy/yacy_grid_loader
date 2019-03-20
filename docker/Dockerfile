@@ -7,6 +7,7 @@ WORKDIR /app/yacy_grid_loader
 
 RUN gradle shadowJar && \
     mkdir data/loader-8200/conf/ -p && \
+    cp -r conf/* data/loader-8200/conf/ && \
     cp docker/config-loader.properties data/loader-8200/conf/config.properties
 
 FROM openjdk:8-alpine as runner

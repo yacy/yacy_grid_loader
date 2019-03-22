@@ -5,10 +5,9 @@ LABEL MAINTAINER="publicplan GmbH"
 COPY --chown=gradle:gradle ./ /app/yacy_grid_loader
 WORKDIR /app/yacy_grid_loader
 
-RUN gradle shadowJar && \
+RUN gradle shadowJar --info && \
     mkdir data/loader-8200/conf/ -p && \
-    cp -r conf/* data/loader-8200/conf/ && \
-    cp docker/config-loader.properties data/loader-8200/conf/config.properties
+    cp -rf conf/* data/loader-8200/conf/
 
 FROM openjdk:8-alpine as runner
 

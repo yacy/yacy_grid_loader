@@ -138,7 +138,6 @@ public class ContentLoader {
 
     public static void load(final WarcWriter warcWriter, String url, final String threadName, final boolean useHeadlessLoader) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
-        
 
         // load entry from crawler index
         String urlid = Digest.encodeMD5Hex(url);
@@ -154,12 +153,12 @@ public class ContentLoader {
             if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
             else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
             else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
-            
+
             // write success status
             if (crawlerDocument != null) {
                 long load_time = System.currentTimeMillis() - t;
                 crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex, urlid);
+                crawlerDocument.store(Data.gridIndex);
                 // check with http://localhost:9200/crawler/_search?q=status_s:loaded
             }
         } catch (IOException e) {
@@ -167,7 +166,7 @@ public class ContentLoader {
             if (crawlerDocument != null) {
                 long load_time = System.currentTimeMillis() - t;
                 crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex, urlid);
+                crawlerDocument.store(Data.gridIndex);
                 // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
             }
             throw e;

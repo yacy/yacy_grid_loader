@@ -97,6 +97,8 @@ public class HtmlUnitLoader {
             public void malformedScriptURL(HtmlPage arg0, String arg1, MalformedURLException arg2) {}
             @Override
             public void loadScriptError(HtmlPage arg0, URL arg1, Exception arg2) {}
+            @Override
+            public void warn(String message, String sourceName, int line, String lineSource, int lineOffset) {}
         });
         webClient.setHTMLParserListener(new HTMLParserListener() {
             @Override

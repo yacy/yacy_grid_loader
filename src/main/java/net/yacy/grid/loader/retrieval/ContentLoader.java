@@ -159,7 +159,7 @@ public class ContentLoader {
             if (crawlerDocument != null) {
                 long load_time = System.currentTimeMillis() - t;
                 crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex, urlid);
+                crawlerDocument.store(Data.gridIndex);
                 // check with http://localhost:9200/crawler/_search?q=status_s:loaded
             }
         } catch (IOException e) {
@@ -167,7 +167,7 @@ public class ContentLoader {
             if (crawlerDocument != null) {
                 long load_time = System.currentTimeMillis() - t;
                 crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex, urlid);
+                crawlerDocument.store(Data.gridIndex);
                 // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
             }
             throw e;

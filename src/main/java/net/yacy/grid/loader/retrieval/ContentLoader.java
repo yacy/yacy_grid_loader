@@ -138,7 +138,6 @@ public class ContentLoader {
 
     public static void load(final WarcWriter warcWriter, String url, final String threadName, final boolean useHeadlessLoader) throws IOException {
         if (url.indexOf("//") < 0) url = "http://" + url;
-        
 
         // load entry from crawler index
         String urlid = Digest.encodeMD5Hex(url);
@@ -154,7 +153,7 @@ public class ContentLoader {
             if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
             else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
             else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
-            
+
             // write success status
             if (crawlerDocument != null) {
                 long load_time = System.currentTimeMillis() - t;

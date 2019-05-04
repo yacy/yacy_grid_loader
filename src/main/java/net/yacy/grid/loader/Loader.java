@@ -134,10 +134,12 @@ public class Loader {
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 
         private final long throttling;
+        private final boolean disableHeadless;
         
-        public LoaderListener(YaCyServices service, long throttling) {
+        public LoaderListener(YaCyServices service, long throttling, boolean disableHeadless) {
              super(service, Runtime.getRuntime().availableProcessors());
              this.throttling = throttling;
+             this.disableHeadless = disableHeadless;
         }
         
         @Override
@@ -150,6 +152,7 @@ public class Loader {
                 JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
                 loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
             }
+            if (disableHeadless) loaderHeadless = false;
             
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
@@ -215,7 +218,8 @@ public class Loader {
         
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
-        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling);
+        boolean disableHeadless = Data.config.containsKey("grid.loader.disableHeadless") ? Boolean.parseBoolean(Data.config.get("grid.loader.disableHeadless")) : false;
+        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling, disableHeadless);
         new Thread(brokerListener).start();
         
         // start server

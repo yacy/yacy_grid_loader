@@ -108,9 +108,24 @@ public class HtmlUnitLoader {
         });
     }
     
+    
+    public static void closeAllWindows(WebClient webClient) {
+        List<WebWindow> wwlist = webClient.getWebWindows();
+        Data.logger.info("HtmlUnitLoader open windows: " + wwlist.size());
+        for (WebWindow webWindow: wwlist) {
+            //Data.logger.info("HtmlUnitLoader window open: " + webWindow.getName());
+            if (!webWindow.getName().startsWith("webloader")) {
+                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
+                webClient.deregisterWebWindow(webWindow);
+            }
+        }
+    }
+    
     public static WebClient getClient() {
         if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
+            WebClient oldWebClient = webClient;
             initClient(userAgentDefault);
+            closeAllWindows(oldWebClient);
         }
         return webClient;
     }
@@ -140,26 +155,15 @@ public class HtmlUnitLoader {
     public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status
 
         WebClient client = getClient();
-        
-        List<WebWindow> wwlist = client.getWebWindows();
-        //Data.logger.info("\nvvv");
-        Data.logger.info("HtmlUnitLoader open windows: " + wwlist.size());
-        for (WebWindow webWindow: wwlist) {
-            //Data.logger.info("HtmlUnitLoader window open: " + webWindow.getName());
-            if (!webWindow.getName().startsWith("webloader")) {
-                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
-                client.deregisterWebWindow(webWindow);
-            }
-        }
-        //Data.logger.info("^^^\n");
-        
+
         this.url = url;
         HtmlPage page;
+        WebWindow webWindow = null;
         try {
             long mem0 = Memory.available();
             URL uurl = UrlUtils.toUrlUnsafe(url);
             String htmlAcceptHeader = client.getBrowserVersion().getHtmlAcceptHeader();
-            WebWindow webWindow = client.openWindow(uurl, windowName); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
+            webWindow = client.openWindow(uurl, windowName); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader);
             page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
@@ -182,6 +186,11 @@ public class HtmlUnitLoader {
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this
             throw new IOException(e.getMessage());
+        } finally {
+            if (webWindow != null) {
+                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
+                client.deregisterWebWindow(webWindow);
+            }
         }
     }
 

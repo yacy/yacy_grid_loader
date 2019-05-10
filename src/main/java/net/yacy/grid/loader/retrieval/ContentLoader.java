@@ -88,7 +88,7 @@ public class ContentLoader {
             Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix, useHeadlessLoader);
             errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
         } catch (IOException e) {
-            Data.logger.warn("ContentLoader.load cannot init WarcWriter", e);
+            Data.logger.warn("ContentLoader.load init problem", e);
         }
         if (out instanceof ByteArrayOutputStream) {
             byte[] b = ((ByteArrayOutputStream) out).toByteArray();
@@ -123,54 +123,61 @@ public class ContentLoader {
         return ww;
     }
     
-    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) {
-        Map<String, String> errors = new LinkedHashMap<>();
+    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) throws IOException {
+
+        // this is here for historical reasons, we actually should have all urls normalized
+        final List<String> fixedURLs = new ArrayList<>();
         urls.forEach(url -> {
-            try {
-                load(warcWriter, url, threadName, useHeadlessLoader);
+            if (url.indexOf("//") < 0) url = "http://" + url;
+            fixedURLs.add(url);
+        });
+        
+        // prepare map with ids and load crawlerDocuments
+        Map<String, String> urlmap = new HashMap<>();
+        fixedURLs.forEach(url -> urlmap.put(url, Digest.encodeMD5Hex(url)));
+        Map<String, CrawlerDocument> crawlerDocuments = CrawlerDocument.loadBulk(Data.gridIndex, urlmap.values());
+
+        // load content
+        Map<String, String> errors = new LinkedHashMap<>();
+        fixedURLs.forEach(url -> {
+            try {                
+                // load entry from crawler index
+                String urlid = urlmap.get(url);
+                CrawlerDocument crawlerDocument = crawlerDocuments.get(urlid);
+                assert crawlerDocument != null;
+                
+                // load content from the network
+                long t = System.currentTimeMillis();
+                try {
+                    if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
+                    else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
+                    else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
+                
+                    // write success status
+                    if (crawlerDocument != null) {
+                        long load_time = System.currentTimeMillis() - t;
+                        crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
+                        // crawlerDocument.store(Data.gridIndex); we bulk-store this later
+                        // check with http://localhost:9200/crawler/_search?q=status_s:loaded
+                    }
+                } catch (IOException e) {
+                    // write fail status
+                    if (crawlerDocument != null) {
+                        long load_time = System.currentTimeMillis() - t;
+                        crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
+                        // crawlerDocument.store(Data.gridIndex); we bulk-store this later
+                        // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
+                    }
+                }
             } catch (Throwable e) {
                 Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
                 errors.put((String) url, e.getMessage());
             }
         });
+        
+        // bulk-store the documents
+        CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments.values());
         return errors;
-    }
-
-    public static void load(final WarcWriter warcWriter, String url, final String threadName, final boolean useHeadlessLoader) throws IOException {
-        if (url.indexOf("//") < 0) url = "http://" + url;
-
-        // load entry from crawler index
-        String urlid = Digest.encodeMD5Hex(url);
-        CrawlerDocument crawlerDocument = null;
-        try {
-            crawlerDocument = CrawlerDocument.load(Data.gridIndex, urlid);
-        } catch (IOException e) {
-            // could not load the crawler document which is strange. It should be there
-        }
-
-        long t = System.currentTimeMillis();
-        try {
-            if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
-            else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
-            else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
-
-            // write success status
-            if (crawlerDocument != null) {
-                long load_time = System.currentTimeMillis() - t;
-                crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex);
-                // check with http://localhost:9200/crawler/_search?q=status_s:loaded
-            }
-        } catch (IOException e) {
-            // write fail status
-            if (crawlerDocument != null) {
-                long load_time = System.currentTimeMillis() - t;
-                crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
-                crawlerDocument.store(Data.gridIndex);
-                // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
-            }
-            throw e;
-        }
     }
 
     private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {

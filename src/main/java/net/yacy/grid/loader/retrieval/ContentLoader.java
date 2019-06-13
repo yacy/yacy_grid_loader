@@ -140,21 +140,22 @@ public class ContentLoader {
         // load content
         Map<String, String> errors = new LinkedHashMap<>();
         fixedURLs.forEach(url -> {
-            try {                
+            try {
                 // load entry from crawler index
                 String urlid = urlmap.get(url);
                 CrawlerDocument crawlerDocument = crawlerDocuments.get(urlid);
-                assert crawlerDocument != null;
-                
+                //assert crawlerDocument != null;
+
                 // load content from the network
                 long t = System.currentTimeMillis();
                 try {
-                    if (url.startsWith("http")) loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
+                    boolean success = false;
+                    if (url.startsWith("http")) success = loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
                     else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
                     else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
-                
+
                     // write success status
-                    if (crawlerDocument != null) {
+                    if (success && crawlerDocument != null) {
                         long load_time = System.currentTimeMillis() - t;
                         crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
                         // crawlerDocument.store(Data.gridIndex); we bulk-store this later
@@ -174,9 +175,13 @@ public class ContentLoader {
                 errors.put((String) url, e.getMessage());
             }
         });
-        
-        // bulk-store the documents
-        CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments.values());
+
+        // bulk-store the crawler documents
+        try {
+            CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments.values());
+        } catch (Throwable e) {
+            Data.logger.error("", e);
+        }
         return errors;
     }
 
@@ -192,8 +197,8 @@ public class ContentLoader {
     static {
         ApacheHttpClient.initClient(userAgentDefault);
     }
-    
-    private static void loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
+
+    private static boolean loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
         if (Memory.shortStatus()) {
             ApacheHttpClient.initClient(userAgentDefault);
         }
@@ -201,7 +206,7 @@ public class ContentLoader {
 
         // first do a HEAD request to find the mime type
         ApacheHttpClient ac = new ApacheHttpClient(url, true);
-        
+
         // here we know the content type
         byte[] content = null;
         MultiProtocolURL u = new MultiProtocolURL(url);
@@ -218,15 +223,19 @@ public class ContentLoader {
             }
             Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
-        
+
         if (content == null) {
             // do another http request. This can either happen because mime type is not html
             // or it was html and HtmlUnit has failed - we retry the normal way here.
 
             ac = new ApacheHttpClient(url, false);
+            int status = ac.getStatusCode();
+            if (status != 200) return false;
             content = ac.getContent();
         }
-        
+
+        if (content == null || content.length == 0) return false;
+
         JwatWarcWriter.writeRequest(warcWriter, url, null, loaddate, null, null, ac.getRequestHeader().getBytes(StandardCharsets.UTF_8));
 
         // add the request header before the content
@@ -234,11 +243,13 @@ public class ContentLoader {
         r.write(ac.getResponseHeader().toString().getBytes(StandardCharsets.UTF_8));
         r.write(content);
         content = r.toByteArray();
-        
+
         Data.logger.info("ContentLoader writing WARC for " + url + " - " + content.length + " bytes");
         JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, content);
+
+        return true;
     }
-    
+
     public static void main(String[] args) {
         Data.init(new File("data/mcp-8100"), new HashMap<String, String>(), false);
         List<String> urls = new ArrayList<>();

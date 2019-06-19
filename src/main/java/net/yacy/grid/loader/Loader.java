@@ -134,10 +134,12 @@ public class Loader {
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 
         private final long throttling;
+        private final boolean disableHeadless;
         
-        public LoaderListener(YaCyServices service, long throttling) {
+        public LoaderListener(YaCyServices service, long throttling, boolean disableHeadless) {
              super(service, Runtime.getRuntime().availableProcessors());
              this.throttling = throttling;
+             this.disableHeadless = disableHeadless;
         }
         
         @Override
@@ -150,6 +152,7 @@ public class Loader {
                 JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
                 loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
             }
+            if (disableHeadless) loaderHeadless = false;
             
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
@@ -162,13 +165,13 @@ public class Loader {
                     Data.logger.warn("", e);
                     return false;
                 }
-                Data.logger.info("Loder.processActoion processed message for targetasset " + targetasset);
+                Data.logger.info("Loader.processAction processed message for targetasset " + targetasset);
                 boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
-                    Data.logger.info("Loder.processActoion stored asset " + targetasset);
+                    Data.logger.info("Loader.processAction stored asset " + targetasset);
                 } catch (Throwable e) {
-                    Data.logger.warn("Loder.processActoion asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
+                    Data.logger.warn("Loader.processAction asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
                     storeToMessage = true;
                 }
                 if (storeToMessage) {
@@ -176,9 +179,9 @@ public class Loader {
                     actions.forEach(a -> 
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
-                    Data.logger.info("Loder.processActoion stored asset " + targetasset + " into message");
+                    Data.logger.info("Loader.processAction stored asset " + targetasset + " into message");
                 }
-                Data.logger.info("Loder.processActoion processed message from queue and stored asset " + targetasset);
+                Data.logger.info("Loader.processAction processed message from queue and stored asset " + targetasset);
                 
                 // throttle
                 if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
@@ -215,7 +218,8 @@ public class Loader {
         
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
-        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling);
+        boolean disableHeadless = Data.config.containsKey("grid.loader.disableHeadless") ? Boolean.parseBoolean(Data.config.get("grid.loader.disableHeadless")) : false;
+        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling, disableHeadless);
         new Thread(brokerListener).start();
         
         // start server

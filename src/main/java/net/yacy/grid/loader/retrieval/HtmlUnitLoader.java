@@ -54,11 +54,15 @@ public class HtmlUnitLoader {
     private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
     private static WebClient webClient = null;
     private static AtomicLong webClientUsage = new AtomicLong(1);
-    
+
     static {
+        initClient();
+    }
+
+    public static void initClient() {
         initClient(userAgentDefault);
     }
-    
+
     public static void initClient(String userAgent) {
         userAgentDefault = userAgent;
         if (webClient != null) {

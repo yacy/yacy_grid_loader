@@ -28,6 +28,8 @@ import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.gargoylesoftware.htmlunit.html.HtmlDivision;
+
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
@@ -43,6 +45,7 @@ import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.GitTool;
+import net.yacy.grid.tools.Memory;
 
 /**
  * The Loader main class
@@ -135,15 +138,22 @@ public class Loader {
 
         private final long throttling;
         private final boolean disableHeadless;
-        
+
         public LoaderListener(YaCyServices service, long throttling, boolean disableHeadless) {
              super(service, Runtime.getRuntime().availableProcessors());
              this.throttling = throttling;
              this.disableHeadless = disableHeadless;
         }
-        
+
         @Override
         public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
+
+
+            // check short memory status
+            if (Memory.shortStatus()) {
+                Data.logger.info("Loader short memory status: assigned = " + Memory.assigned() + ", used = " + Memory.used());
+                HtmlUnitLoader.initClient();
+            }
 
             // find out if we should do headless loading
             String crawlID = action.getStringAttr("id");
@@ -153,7 +163,7 @@ public class Loader {
                 loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
             }
             if (disableHeadless) loaderHeadless = false;
-            
+
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
             Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
@@ -182,7 +192,7 @@ public class Loader {
                     Data.logger.info("Loader.processAction stored asset " + targetasset + " into message");
                 }
                 Data.logger.info("Loader.processAction processed message from queue and stored asset " + targetasset);
-                
+
                 // throttle
                 if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
 

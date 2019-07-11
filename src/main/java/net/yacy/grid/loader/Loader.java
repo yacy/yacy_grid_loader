@@ -223,7 +223,7 @@ public class Loader {
         new Thread(brokerListener).start();
         
         // start server
-        Data.logger.info("Loder.main started Loader");
+        Data.logger.info("Loader.main started Loader");
         Data.logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();

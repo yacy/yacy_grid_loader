@@ -28,8 +28,6 @@ import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import com.gargoylesoftware.htmlunit.html.HtmlDivision;
-
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
 import net.yacy.grid.YaCyServices;
@@ -38,7 +36,6 @@ import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
 import net.yacy.grid.loader.retrieval.ApacheHttpClient;
 import net.yacy.grid.loader.retrieval.ContentLoader;
-import net.yacy.grid.loader.retrieval.HtmlUnitLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
@@ -66,7 +63,7 @@ public class Loader {
             LoaderService.class,
             ProcessService.class
     };
-    
+
     /**
      * broker listener, takes process messages from the queue "loader", "webloader"
      * i.e. test with:
@@ -152,7 +149,6 @@ public class Loader {
             // check short memory status
             if (Memory.shortStatus()) {
                 Data.logger.info("Loader short memory status: assigned = " + Memory.assigned() + ", used = " + Memory.used());
-                HtmlUnitLoader.initClient();
             }
 
             // find out if we should do headless loading
@@ -207,7 +203,7 @@ public class Loader {
             return false;
         }
     }
-    
+
     public static void main(String[] args) {
         // initialize environment variables
         List<Class<? extends Servlet>> services = new ArrayList<>();
@@ -224,19 +220,18 @@ public class Loader {
         if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
         if ("BROWSER".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
         ApacheHttpClient.initClient(userAgent);
-        HtmlUnitLoader.initClient(userAgent);
-        
+
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
         boolean disableHeadless = Data.config.containsKey("grid.loader.disableHeadless") ? Boolean.parseBoolean(Data.config.get("grid.loader.disableHeadless")) : false;
         BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling, disableHeadless);
         new Thread(brokerListener).start();
-        
+
         // start server
         Data.logger.info("Loader.main started Loader");
         Data.logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();
     }
-    
+
 }

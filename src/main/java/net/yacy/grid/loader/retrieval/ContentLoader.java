@@ -71,7 +71,7 @@ public class ContentLoader {
 
     public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
         Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
-        
+
         // construct a WARC
         OutputStream out;
         File tmp = null;
@@ -140,6 +140,7 @@ public class ContentLoader {
         // load content
         Map<String, String> errors = new LinkedHashMap<>();
         fixedURLs.forEach(url -> {
+            Thread.currentThread().setName(threadName + " loading " + url.toString());
             try {
                 // load entry from crawler index
                 String urlid = urlmap.get(url);

@@ -36,13 +36,13 @@ import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
 import net.yacy.grid.loader.retrieval.ApacheHttpClient;
 import net.yacy.grid.loader.retrieval.ContentLoader;
-import net.yacy.grid.loader.retrieval.HtmlUnitLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.GitTool;
+import net.yacy.grid.tools.Memory;
 
 /**
  * The Loader main class
@@ -63,7 +63,7 @@ public class Loader {
             LoaderService.class,
             ProcessService.class
     };
-    
+
     /**
      * broker listener, takes process messages from the queue "loader", "webloader"
      * i.e. test with:
@@ -135,15 +135,21 @@ public class Loader {
 
         private final long throttling;
         private final boolean disableHeadless;
-        
+
         public LoaderListener(YaCyServices service, long throttling, boolean disableHeadless) {
              super(service, Runtime.getRuntime().availableProcessors());
              this.throttling = throttling;
              this.disableHeadless = disableHeadless;
         }
-        
+
         @Override
         public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
+
+
+            // check short memory status
+            if (Memory.shortStatus()) {
+                Data.logger.info("Loader short memory status: assigned = " + Memory.assigned() + ", used = " + Memory.used());
+            }
 
             // find out if we should do headless loading
             String crawlID = action.getStringAttr("id");
@@ -153,7 +159,7 @@ public class Loader {
                 loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
             }
             if (disableHeadless) loaderHeadless = false;
-            
+
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
             Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
@@ -182,7 +188,7 @@ public class Loader {
                     Data.logger.info("Loader.processAction stored asset " + targetasset + " into message");
                 }
                 Data.logger.info("Loader.processAction processed message from queue and stored asset " + targetasset);
-                
+
                 // throttle
                 if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
 
@@ -197,7 +203,7 @@ public class Loader {
             return false;
         }
     }
-    
+
     public static void main(String[] args) {
         // initialize environment variables
         List<Class<? extends Servlet>> services = new ArrayList<>();
@@ -214,19 +220,18 @@ public class Loader {
         if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
         if ("BROWSER".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
         ApacheHttpClient.initClient(userAgent);
-        HtmlUnitLoader.initClient(userAgent);
-        
+
         // start listener
         long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
         boolean disableHeadless = Data.config.containsKey("grid.loader.disableHeadless") ? Boolean.parseBoolean(Data.config.get("grid.loader.disableHeadless")) : false;
         BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling, disableHeadless);
         new Thread(brokerListener).start();
-        
+
         // start server
-        Data.logger.info("Loder.main started Loader");
+        Data.logger.info("Loader.main started Loader");
         Data.logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();
     }
-    
+
 }

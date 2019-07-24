@@ -22,9 +22,7 @@ package net.yacy.grid.loader.retrieval;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 import java.util.TimeZone;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.gargoylesoftware.css.parser.CSSException;
 import com.gargoylesoftware.css.parser.CSSParseException;
@@ -32,6 +30,7 @@ import com.gargoylesoftware.css.parser.CSSErrorHandler;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.BrowserVersion.BrowserVersionBuilder;
 import com.gargoylesoftware.htmlunit.IncorrectnessListener;
+import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.ScriptException;
 import com.gargoylesoftware.htmlunit.TopLevelWindow;
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -51,21 +50,12 @@ import net.yacy.grid.tools.Memory;
  */
 public class HtmlUnitLoader {
 
-    private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
-    private static WebClient webClient = null;
-    private static AtomicLong webClientUsage = new AtomicLong(1);
-    
-    static {
-        initClient(userAgentDefault);
+    public static WebClient getClient() {
+        return getClient(BrowserVersion.CHROME.getUserAgent());
     }
-    
-    public static void initClient(String userAgent) {
-        userAgentDefault = userAgent;
-        if (webClient != null) {
-            webClient.getCache().clear();
-            webClient.close();
-        }
-        webClient = new WebClient(getBrowser(userAgent));
+
+    public static WebClient getClient(String userAgent) {
+        WebClient webClient = new WebClient(getBrowser(userAgent));
         WebClientOptions options = webClient.getOptions();
         options.setJavaScriptEnabled(true);
         options.setCssEnabled(false);
@@ -75,6 +65,13 @@ public class HtmlUnitLoader {
         options.setGeolocationEnabled(false);
         options.setPrintContentOnFailingStatusCode(false);
         options.setThrowExceptionOnScriptError(false);
+        options.setMaxInMemory(0);
+        options.setHistoryPageCacheLimit(0);
+        options.setHistorySizeLimit(0);
+        //ProxyConfig proxyConfig = new ProxyConfig();
+        //proxyConfig.setProxyHost("127.0.0.1");
+        //proxyConfig.setProxyPort(Service.getPort());
+        //options.setProxyConfig(proxyConfig);
         webClient.getCache().setMaxSize(10000); // this might be a bit large, is regulated with throttling and client cache clear in short memory status
         webClient.setIncorrectnessListener(new IncorrectnessListener() {
             @Override
@@ -106,42 +103,22 @@ public class HtmlUnitLoader {
             @Override
             public void warning(String message, URL url, String html, int line, int column, String key) {}
         });
-    }
-    
-    
-    public static void closeAllWindows(WebClient webClient) {
-        List<WebWindow> wwlist = webClient.getWebWindows();
-        Data.logger.info("HtmlUnitLoader open windows: " + wwlist.size());
-        for (WebWindow webWindow: wwlist) {
-            //Data.logger.info("HtmlUnitLoader window open: " + webWindow.getName());
-            if (!webWindow.getName().startsWith("webloader")) {
-                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
-                webClient.deregisterWebWindow(webWindow);
-            }
-        }
-    }
-    
-    public static WebClient getClient() {
-        if (Memory.shortStatus() || webClientUsage.incrementAndGet() % 1000 == 0) {
-            WebClient oldWebClient = webClient;
-            initClient(userAgentDefault);
-            closeAllWindows(oldWebClient);
-        }
         return webClient;
     }
 
-    public static BrowserVersion getBrowser(String userAgent) {
+
+    private static BrowserVersion getBrowser(String userAgent) {
         BrowserVersionBuilder browserBuilder = getBrowserBuilder();
         browserBuilder.setUserAgent(userAgent);
         return browserBuilder.build();
     }
-    
-    public static BrowserVersionBuilder getBrowserBuilder() {
+
+    private static BrowserVersionBuilder getBrowserBuilder() {
         BrowserVersionBuilder browserBuilder = new BrowserVersion.BrowserVersionBuilder(BrowserVersion.CHROME);
         browserBuilder.setSystemTimezone(TimeZone.getDefault());
         return browserBuilder;
     }
-    
+
     private String url, xml;
 
     public String getUrl() {
@@ -154,43 +131,37 @@ public class HtmlUnitLoader {
 
     public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status
 
-        WebClient client = getClient();
-
         this.url = url;
         HtmlPage page;
-        WebWindow webWindow = null;
-        try {
+        try (WebClient client = getClient()) {
             long mem0 = Memory.available();
             URL uurl = UrlUtils.toUrlUnsafe(url);
             String htmlAcceptHeader = client.getBrowserVersion().getHtmlAcceptHeader();
-            webWindow = client.openWindow(uurl, windowName); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
+            WebWindow webWindow = client.openWindow(uurl, windowName); // throws ClassCastException: com.gargoylesoftware.htmlunit.UnexpectedPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader);
             page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
-            webWindow.getEnclosedPage().cleanUp();
-            if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
-            client.deregisterWebWindow(webWindow);
             long mem1 = Memory.available();
-            if (Memory.shortStatus()) client.getCache().clear();
-            if (Memory.shortStatus()) {
-                client.close();
-                initClient(userAgentDefault);
+            Page htmlpage = webWindow.getEnclosedPage();
+            htmlpage.cleanUp();
+            if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
+            for (WebWindow ww: client.getWebWindows()) {
+                if (ww instanceof TopLevelWindow) ((TopLevelWindow) ww).close();
+                ww.getJobManager().removeAllJobs();
             }
-            Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes");
+            client.deregisterWebWindow(webWindow);
+            client.getCache().clear();
+            client.close();
+            long mem2 = Memory.available();
+            Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes, after cleanup " + (mem2 - mem0) + " bytes");
         } catch (Throwable e) {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.
             // Therefore, we should do a fail-over without HTMLUnit
             // Data.logger.warn("HtmlUnitLoader Error loading " + url, e);
-            
             // load the page with standard client anyway
             // to do this, we throw an IOException here and the caller must handle this
             throw new IOException(e.getMessage());
-        } finally {
-            if (webWindow != null) {
-                if (webWindow instanceof TopLevelWindow) ((TopLevelWindow) webWindow).close();
-                client.deregisterWebWindow(webWindow);
-            }
         }
     }
 

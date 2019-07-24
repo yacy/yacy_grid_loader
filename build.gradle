@@ -16,7 +16,7 @@ sourceSets {
 }
 
 mainClassName = "net.yacy.grid.loader.Loader"
-applicationDefaultJvmArgs = ["-Xmx4g"]
+applicationDefaultJvmArgs = ["-Xmx8g"]
 
 group = 'net.yacy'
 version = '0.0.1-SNAPSHOT'

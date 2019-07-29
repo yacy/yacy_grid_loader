@@ -48,6 +48,7 @@ import ai.susi.mind.SusiAction.RenderType;
 import net.yacy.grid.io.index.CrawlerDocument;
 import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
+import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Classification.ContentDomain;
 import net.yacy.grid.tools.Digest;
@@ -55,22 +56,27 @@ import net.yacy.grid.tools.Memory;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
-    
-    
-    public static byte[] eval(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
+
+    private byte[] content;
+    private ActionResult result;
+
+    public ContentLoader(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
+        this.content = new byte[0];
+        this.result = ActionResult.FAIL_IRREVERSIBLE;
+
         // this must have a loader action
-        if (action.getRenderType() != RenderType.loader) return new byte[0];
-        
+        if (action.getRenderType() != RenderType.loader) {
+            return; 
+        }
+
         // extract urls
         JSONArray urls = action.getArrayAttr("urls");
         List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
-        byte[] payload = data.toString(2).getBytes(StandardCharsets.UTF_8);
-        return load(urlss, payload, compressed, threadnameprefix, useHeadlessLoader);
-    }
+        byte[] warcPayload = data.toString(2).getBytes(StandardCharsets.UTF_8);
 
-    public static byte[] load(List<String> urls, byte[] header, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
-        Thread.currentThread().setName(threadnameprefix + " loading " + urls.toString());
+        // start loading
+        Thread.currentThread().setName(threadnameprefix + " loading " + urlss.toString());
 
         // construct a WARC
         OutputStream out;
@@ -84,31 +90,48 @@ public class ContentLoader {
             out = new ByteArrayOutputStream();
         }
         try {
-            WarcWriter ww = ContentLoader.initWriter(out, header, compressed);
-            Map<String, String> errors = ContentLoader.load(ww, urls, threadnameprefix, useHeadlessLoader);
-            errors.forEach((u, c) -> Data.logger.debug("Loader - cannot load: " + u + " - " + c));
+            WarcWriter ww = ContentLoader.initWriter(out, warcPayload, compressed);
+            Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, useHeadlessLoader);
+            this.result = ActionResult.SUCCESS;
+            errors.forEach((u, c) -> {
+                Data.logger.debug("Loader - cannot load: " + u + " - " + c);
+                if (c == ActionResult.FAIL_RETRY && this.result == ActionResult.SUCCESS) this.result = ActionResult.FAIL_RETRY;
+                if (c == ActionResult.FAIL_IRREVERSIBLE) this.result = ActionResult.FAIL_IRREVERSIBLE;
+            });
         } catch (IOException e) {
             Data.logger.warn("ContentLoader.load init problem", e);
+        } finally {
+            if (out != null) try {out.close();} catch (IOException e) {}
         }
         if (out instanceof ByteArrayOutputStream) {
-            byte[] b = ((ByteArrayOutputStream) out).toByteArray();
-            return b;
+            this.content = ((ByteArrayOutputStream) out).toByteArray();
+            this.result = ActionResult.SUCCESS;
+            return;
         } else {
             try {
-                out.close();
                 // open the file again to create a byte[]
-                byte[] b = Files.readAllBytes(tmp.toPath());
+                this.content = Files.readAllBytes(tmp.toPath());
+                this.result = ActionResult.SUCCESS;
                 tmp.delete();
                 if (tmp.exists()) tmp.deleteOnExit();
-                return b;
+                return;
             } catch (IOException e) {
                 // this should not happen since we had been able to open the file
                 Data.logger.warn("", e);
-                return new byte[0];
+                return; // fail irreversible
             }
         }
     }
-    
+
+
+    public byte[] getContent() {
+        return content;
+    }
+
+    public ActionResult getResult() {
+        return result;
+    }
+
     private final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
     private final static AtomicLong createTempFileCounter = new AtomicLong(0);
     public static File createTempFile(String prefix, String suffix) throws IOException {
@@ -116,14 +139,14 @@ public class ContentLoader {
         File tmp = File.createTempFile(tmpprefix, suffix);
         return tmp;
     }
-    
+
     private static WarcWriter initWriter(OutputStream out, byte[] payload, boolean compressed) throws IOException {
         WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
         JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, payload);
         return ww;
     }
-    
-    public static Map<String, String> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) throws IOException {
+
+    private static Map<String, ActionResult> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) throws IOException {
 
         // this is here for historical reasons, we actually should have all urls normalized
         final List<String> fixedURLs = new ArrayList<>();
@@ -138,7 +161,7 @@ public class ContentLoader {
         Map<String, CrawlerDocument> crawlerDocuments = CrawlerDocument.loadBulk(Data.gridIndex, urlmap.values());
 
         // load content
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, ActionResult> errors = new LinkedHashMap<>();
         fixedURLs.forEach(url -> {
             Thread.currentThread().setName(threadName + " loading " + url.toString());
             try {
@@ -173,7 +196,7 @@ public class ContentLoader {
                 }
             } catch (Throwable e) {
                 Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
-                errors.put((String) url, e.getMessage());
+                errors.put((String) url, ActionResult.FAIL_IRREVERSIBLE);
             }
         });
 
@@ -187,13 +210,13 @@ public class ContentLoader {
     }
 
     private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {
-        
+
     }
-    
+
     private static void loadSMB(WarcWriter warcWriter, String url) throws IOException {
-        
+
     }
-    
+
     private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
     static {
         ApacheHttpClient.initClient(userAgentDefault);
@@ -251,6 +274,7 @@ public class ContentLoader {
         return true;
     }
 
+    /*
     public static void main(String[] args) {
         Data.init(new File("data/mcp-8100"), new HashMap<String, String>(), false);
         List<String> urls = new ArrayList<>();
@@ -259,5 +283,6 @@ public class ContentLoader {
         byte[] warc = load(urls, "Test".getBytes(), false, "test", true);
         System.out.println(new String(warc, StandardCharsets.UTF_8));
     }
-    
+    */
+
 }

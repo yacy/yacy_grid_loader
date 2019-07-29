@@ -45,7 +45,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
 
     private static final long serialVersionUID = 8578474303031749879L;
     public static final String NAME = "warcloader";
-    
+
     @Override
     public String getAPIPath() {
         return "/yacy/grid/loader/" + NAME + ".warc.gz";
@@ -55,14 +55,15 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
     public ServiceResponse serviceImpl(Query call, HttpServletResponse response) {
         // construct the same process as if it was submitted on a queue
         SusiThought process = ProcessService.queryToProcess(call);
-        
+
         // extract call parameter here to enhance ability to debug
         SusiAction action = process.getActions().get(0);
         JSONArray data = process.getData();
 
         // construct a WARC
-        byte[] b = ContentLoader.eval(action, data, true, "api call from " + call.getClientHost(), true);
-        
+        ContentLoader cl = new ContentLoader(action, data, true, "api call from " + call.getClientHost(), true);
+        byte[] b = cl.getContent();
+
         // store the WARC as asset if wanted
         return new ServiceResponse(b);
     }

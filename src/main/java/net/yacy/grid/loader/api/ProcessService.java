@@ -49,7 +49,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
 
     private static final long serialVersionUID = 8578474303031749879L;
     public static final String NAME = "warcprocess";
-    
+
     @Override
     public String getAPIPath() {
         return "/yacy/grid/loader/" + NAME + ".json";
@@ -59,11 +59,12 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
     public ServiceResponse serviceImpl(Query call, HttpServletResponse response) {
         // construct the same process as if it was submitted on a queue
         SusiThought process = queryToProcess(call); 
-        
+
         // construct a WARC
         String targetasset = process.getObservation("targetasset");
-        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost(), true);
-        
+        ContentLoader cl = new ContentLoader(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost(), true);
+        byte[] b = cl.getContent();
+
         // store the WARC as asset if wanted
         JSONObject json = new JSONObject(true);
         if (targetasset != null && targetasset.length() > 0) {

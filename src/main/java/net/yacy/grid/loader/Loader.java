@@ -143,8 +143,7 @@ public class Loader {
         }
 
         @Override
-        public boolean processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
-
+        public ActionResult processAction(SusiAction action, JSONArray data, String processName, int processNumber) {
 
             // check short memory status
             if (Memory.shortStatus()) {
@@ -164,14 +163,21 @@ public class Loader {
             String threadnameprefix = processName + "-" + processNumber;
             Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
             if (targetasset != null && targetasset.length() > 0) {
+                ActionResult actionResult = ActionResult.SUCCESS;
                 final byte[] b;
                 try {
-                    b = ContentLoader.eval(action, data, targetasset.endsWith(".gz"), threadnameprefix, loaderHeadless);
+                    ContentLoader cl = new ContentLoader(action, data, targetasset.endsWith(".gz"), threadnameprefix, loaderHeadless);
+                    b = cl.getContent();
+                    actionResult = cl.getResult();
                 } catch (Throwable e) {
                     Data.logger.warn("", e);
-                    return false;
+                    return ActionResult.FAIL_IRREVERSIBLE;
                 }
-                Data.logger.info("Loader.processAction processed message for targetasset " + targetasset);
+                if (actionResult == ActionResult.FAIL_IRREVERSIBLE) {
+                    Data.logger.info("Loader.processAction FAILED processed message for targetasset " + targetasset);
+                    return actionResult;
+                }
+                Data.logger.info("Loader.processAction SUCCESS processed message for targetasset " + targetasset);
                 boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
@@ -193,14 +199,14 @@ public class Loader {
                 if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
 
                 // success (has done something)
-                return true;
+                return actionResult;
             }
 
             // throttle twice
             if (this.throttling > 0) try {Thread.sleep(2 * this.throttling);} catch (InterruptedException e) {}
 
             // fail (nothing done)
-            return false;
+            return ActionResult.FAIL_IRREVERSIBLE;
         }
     }
 

@@ -60,7 +60,9 @@ public class ContentLoader {
     private byte[] content;
     private ActionResult result;
 
-    public ContentLoader(SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, final boolean useHeadlessLoader) {
+    public ContentLoader(
+            SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, 
+            final String id, final int depth, final int crawlingDepth, final boolean loaderHeadless, final int priority) {
         this.content = new byte[0];
         this.result = ActionResult.FAIL_IRREVERSIBLE;
 
@@ -91,7 +93,7 @@ public class ContentLoader {
         }
         try {
             WarcWriter ww = ContentLoader.initWriter(out, warcPayload, compressed);
-            Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, useHeadlessLoader);
+            Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, id, depth, crawlingDepth, loaderHeadless, priority);
             this.result = ActionResult.SUCCESS;
             errors.forEach((u, c) -> {
                 Data.logger.debug("Loader - cannot load: " + u + " - " + c);
@@ -146,7 +148,9 @@ public class ContentLoader {
         return ww;
     }
 
-    private static Map<String, ActionResult> load(final WarcWriter warcWriter, final List<String> urls, final String threadName, final boolean useHeadlessLoader) throws IOException {
+    private static Map<String, ActionResult> load(
+            final WarcWriter warcWriter, final List<String> urls, final String threadName,
+            final String id, final int depth, final int crawlingDepth, final boolean loaderHeadless, final int priority) throws IOException {
 
         // this is here for historical reasons, we actually should have all urls normalized
         final List<String> fixedURLs = new ArrayList<>();
@@ -154,7 +158,7 @@ public class ContentLoader {
             if (url.indexOf("//") < 0) url = "http://" + url;
             fixedURLs.add(url);
         });
-        
+
         // prepare map with ids and load crawlerDocuments
         Map<String, String> urlmap = new HashMap<>();
         fixedURLs.forEach(url -> urlmap.put(url, Digest.encodeMD5Hex(url)));
@@ -163,7 +167,16 @@ public class ContentLoader {
         // load content
         Map<String, ActionResult> errors = new LinkedHashMap<>();
         fixedURLs.forEach(url -> {
-            Thread.currentThread().setName(threadName + " loading " + url.toString());
+
+            // do loader throttling here
+            long throttling = 501;
+            try {
+                throttling = Data.gridControl.checkThrottling(id, url, depth, crawlingDepth, loaderHeadless, priority);
+            } catch (IOException e1) {}
+            Thread.currentThread().setName(threadName + " loading " + url.toString() + ", throttling = " + throttling);
+            try {Thread.sleep(throttling);} catch (InterruptedException e) {}
+
+            // start loading
             try {
                 // load entry from crawler index
                 String urlid = urlmap.get(url);
@@ -174,7 +187,7 @@ public class ContentLoader {
                 long t = System.currentTimeMillis();
                 try {
                     boolean success = false;
-                    if (url.startsWith("http")) success = loadHTTP(warcWriter, url, threadName, useHeadlessLoader);
+                    if (url.startsWith("http")) success = loadHTTP(warcWriter, url, threadName, loaderHeadless);
                     else  if (url.startsWith("ftp")) loadFTP(warcWriter, url);
                     else  if (url.startsWith("smb")) loadSMB(warcWriter, url);
 

@@ -22,6 +22,7 @@ package net.yacy.grid.loader.api;
 import javax.servlet.http.HttpServletResponse;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
@@ -60,8 +61,18 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         SusiAction action = process.getActions().get(0);
         JSONArray data = process.getData();
 
+        // find out if we should do headless loading
+        String crawlID = action.getStringAttr("id");
+        JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+        int depth = action.getIntAttr("depth");
+        int crawlingDepth = crawl.getInt("crawlingDepth");
+        int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
+        boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
+
         // construct a WARC
-        ContentLoader cl = new ContentLoader(action, data, true, "api call from " + call.getClientHost(), true);
+        ContentLoader cl = new ContentLoader(
+                action, data, true, "api call from " + call.getClientHost(),
+                crawlID, depth, crawlingDepth, loaderHeadless, priority);
         byte[] b = cl.getContent();
 
         // store the WARC as asset if wanted

@@ -41,6 +41,7 @@ import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
+import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.tools.GitTool;
 import net.yacy.grid.tools.Memory;
 
@@ -133,12 +134,10 @@ public class Loader {
      */
     public static class LoaderListener extends AbstractBrokerListener implements BrokerListener {
 
-        private final long throttling;
         private final boolean disableHeadless;
 
-        public LoaderListener(YaCyServices service, long throttling, boolean disableHeadless) {
+        public LoaderListener(YaCyServices service, boolean disableHeadless) {
              super(service, Runtime.getRuntime().availableProcessors());
-             this.throttling = throttling;
              this.disableHeadless = disableHeadless;
         }
 
@@ -152,11 +151,19 @@ public class Loader {
 
             // find out if we should do headless loading
             String crawlID = action.getStringAttr("id");
-            boolean loaderHeadless = true;
-            if (crawlID != null && crawlID.length() > 0) {
-                JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
-                loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
+            if (crawlID == null || crawlID.length() == 0) {
+                Data.logger.info("Loader.processAction Fail: Action does not have an id: " + action.toString());
+                return ActionResult.FAIL_IRREVERSIBLE;
             }
+            JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+            if (crawl == null) {
+                Data.logger.info("Loader.processAction Fail: ID of Action not found in data: " + action.toString());
+                return ActionResult.FAIL_IRREVERSIBLE;
+            }
+            int depth = action.getIntAttr("depth");
+            int crawlingDepth = crawl.getInt("crawlingDepth");
+            int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
+            boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
             if (disableHeadless) loaderHeadless = false;
 
             String targetasset = action.getStringAttr("targetasset");
@@ -166,7 +173,7 @@ public class Loader {
                 ActionResult actionResult = ActionResult.SUCCESS;
                 final byte[] b;
                 try {
-                    ContentLoader cl = new ContentLoader(action, data, targetasset.endsWith(".gz"), threadnameprefix, loaderHeadless);
+                    ContentLoader cl = new ContentLoader(action, data, targetasset.endsWith(".gz"), threadnameprefix, crawlID, depth, crawlingDepth, loaderHeadless, priority);
                     b = cl.getContent();
                     actionResult = cl.getResult();
                 } catch (Throwable e) {
@@ -195,15 +202,9 @@ public class Loader {
                 }
                 Data.logger.info("Loader.processAction processed message from queue and stored asset " + targetasset);
 
-                // throttle
-                if (this.throttling > 0) try {Thread.sleep(this.throttling);} catch (InterruptedException e) {}
-
                 // success (has done something)
                 return actionResult;
             }
-
-            // throttle twice
-            if (this.throttling > 0) try {Thread.sleep(2 * this.throttling);} catch (InterruptedException e) {}
 
             // fail (nothing done)
             return ActionResult.FAIL_IRREVERSIBLE;
@@ -228,9 +229,8 @@ public class Loader {
         ApacheHttpClient.initClient(userAgent);
 
         // start listener
-        long throttling = Data.config.containsKey("grid.loader.throttling") ? Long.parseLong(Data.config.get("grid.loader.throttling")) : 0;
         boolean disableHeadless = Data.config.containsKey("grid.loader.disableHeadless") ? Boolean.parseBoolean(Data.config.get("grid.loader.disableHeadless")) : false;
-        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, throttling, disableHeadless);
+        BrokerListener brokerListener = new LoaderListener(LOADER_SERVICE, disableHeadless);
         new Thread(brokerListener).start();
 
         // start server

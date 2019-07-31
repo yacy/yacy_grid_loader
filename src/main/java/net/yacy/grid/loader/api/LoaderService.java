@@ -22,6 +22,7 @@ package net.yacy.grid.loader.api;
 import javax.servlet.http.HttpServletResponse;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiThought;
@@ -45,7 +46,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
 
     private static final long serialVersionUID = 8578474303031749879L;
     public static final String NAME = "warcloader";
-    
+
     @Override
     public String getAPIPath() {
         return "/yacy/grid/loader/" + NAME + ".warc.gz";
@@ -55,14 +56,25 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
     public ServiceResponse serviceImpl(Query call, HttpServletResponse response) {
         // construct the same process as if it was submitted on a queue
         SusiThought process = ProcessService.queryToProcess(call);
-        
+
         // extract call parameter here to enhance ability to debug
         SusiAction action = process.getActions().get(0);
         JSONArray data = process.getData();
 
+        // find out if we should do headless loading
+        String crawlID = action.getStringAttr("id");
+        JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+        int depth = action.getIntAttr("depth");
+        int crawlingDepth = crawl.getInt("crawlingDepth");
+        int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
+        boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
+
         // construct a WARC
-        byte[] b = ContentLoader.eval(action, data, true, "api call from " + call.getClientHost(), true);
-        
+        ContentLoader cl = new ContentLoader(
+                action, data, true, "api call from " + call.getClientHost(),
+                crawlID, depth, crawlingDepth, loaderHeadless, priority);
+        byte[] b = cl.getContent();
+
         // store the WARC as asset if wanted
         return new ServiceResponse(b);
     }

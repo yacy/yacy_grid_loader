@@ -49,7 +49,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
 
     private static final long serialVersionUID = 8578474303031749879L;
     public static final String NAME = "warcprocess";
-    
+
     @Override
     public String getAPIPath() {
         return "/yacy/grid/loader/" + NAME + ".json";
@@ -59,11 +59,24 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
     public ServiceResponse serviceImpl(Query call, HttpServletResponse response) {
         // construct the same process as if it was submitted on a queue
         SusiThought process = queryToProcess(call); 
-        
+        SusiAction action = process.getActions().iterator().next();
+        JSONArray data = process.getData();
+
+        // find out if we should do headless loading
+        String crawlID = action.getStringAttr("id");
+        JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+        int depth = action.getIntAttr("depth");
+        int crawlingDepth = crawl.getInt("crawlingDepth");
+        int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
+        boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
+
         // construct a WARC
         String targetasset = process.getObservation("targetasset");
-        byte[] b = ContentLoader.eval(process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost(), true);
-        
+        ContentLoader cl = new ContentLoader(
+                process.getActions().get(0), process.getData(), targetasset.endsWith(".gz"), "api call from " + call.getClientHost(),
+                crawlID, depth, crawlingDepth, loaderHeadless, priority);
+        byte[] b = cl.getContent();
+
         // store the WARC as asset if wanted
         JSONObject json = new JSONObject(true);
         if (targetasset != null && targetasset.length() > 0) {
@@ -82,10 +95,16 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         }
         return new ServiceResponse(json);
     }
-    
+
     public static SusiThought queryToProcess(Query call) {
+        // read query attributes
+        String id = call.get("id", "*id*"); // the crawl id
         String url = call.get("url", "");
-        int urlCount = call.get("urls", 0);
+        int urlCount = 1;
+        int depth = call.get("depth", 0);
+        int crawlingDepth = call.get("crawlingDepth", 0); // the maximum depth for the crawl start of this domain
+        boolean loaderHeadless = call.get("loaderHeadless", false);
+        int priority = call.get("priority", 0);
         String collection = call.get("collection", "");
         String targetasset = call.get("targetasset", "");
 
@@ -94,12 +113,22 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         process.setProcess("yacy_grid_loader");
         if (collection.length() > 0) process.addObservation("collection", collection);
 
+        JSONObject crawl = new JSONObject();
+        crawl.put("id", id);
+        crawl.put("start_url", url);
+        crawl.put("crawlingDepth", crawlingDepth);
+        crawl.put("priority", priority);
+        crawl.put("loaderHeadless", loaderHeadless);
+
         // create action
         JSONObject action = new JSONObject();
         JSONArray urls = new JSONArray();
+        urls.put(url);
+        action.put("id", id);
         action.put("type", RenderType.loader.name());
         action.put("queue", "loader");
         action.put("urls", urls);
+        action.put("depth", depth);
         if (collection.length() > 0) action.put("collection", collection);
         if (targetasset.length() > 0) action.put("targetasset", targetasset);
         if (url.length() > 0) urls.put(url);
@@ -108,7 +137,8 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
             if (url.length() > 0) urls.put(url);
         }
         process.addAction(new SusiAction(action));
-        
+        process.setData(new JSONArray().put(crawl));
+
         return process;
     }
 

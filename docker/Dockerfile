@@ -1,21 +1,22 @@
-FROM gradle:4.10-jdk8-alpine as builder
+FROM gradle:5.4-jdk8-alpine as builder
 MAINTAINER publicplan GmbH
 LABEL MAINTAINER="publicplan GmbH"
 
 COPY --chown=gradle:gradle ./ /app/yacy_grid_loader
 WORKDIR /app/yacy_grid_loader
 
-RUN gradle shadowJar --info && \
+RUN gradle build --info && \
+    mkdir build/distributions/app && \
+    unzip build/distributions/*.zip -d build/distributions/app && \
     mkdir data/loader-8200/conf/ -p && \
     cp -rf conf/* data/loader-8200/conf/
 
 FROM openjdk:8-alpine as runner
 
-WORKDIR /app
-
-COPY --from=builder /app/yacy_grid_loader/build/libs/*.jar /app/yacy-grid-loader.jar
+COPY --from=builder /app/yacy_grid_loader/build/distributions/app/* /app
 COPY --from=builder /app/yacy_grid_loader/data /app/data
 
-EXPOSE 8100
-ENTRYPOINT ["java"]
-CMD ["-jar", "yacy-grid-loader.jar"]
+WORKDIR /app
+EXPOSE 8200
+ENTRYPOINT ["/bin/sh"]
+CMD ["bin/yacy_grid_loader"]

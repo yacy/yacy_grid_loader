@@ -53,6 +53,12 @@ dependencies {
     compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.35.0'
 }
 
+jar {
+    manifest {
+        attributes "Main-Class": "${project.mainClassName}"
+    }
+}
+
 shadowJar {
    baseName = 'shadow'
    classifier = null

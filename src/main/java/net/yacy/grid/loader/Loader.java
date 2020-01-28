@@ -221,11 +221,12 @@ public class Loader {
 
         // initialize loader with user agent
         String userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent;
-        String userAgentType = Data.config.get("grid.lodeer.userAgentType");
+        String userAgentType = Data.config.get("grid.loader.userAgentType");
+        if (userAgentType == null || userAgentType.length() == 0) userAgentType = "BROWSER";
         if ("CUSTOM".equals(userAgentType)) userAgent = Data.config.get("grid.lodeer.userAgentName");
-        if ("YACY".equals(userAgentType)) userAgent = ClientIdentification.yacyInternetCrawlerAgent.userAgent;
-        if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
-        if ("BROWSER".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
+        else if ("YACY".equals(userAgentType)) userAgent = ClientIdentification.yacyInternetCrawlerAgent.userAgent;
+        else if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
+        else userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
         ApacheHttpClient.initClient(userAgent);
 
         // start listener

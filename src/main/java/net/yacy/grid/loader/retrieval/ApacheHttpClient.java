@@ -33,12 +33,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSession;
 
 import org.apache.http.Header;
+import org.apache.http.HeaderElement;
+import org.apache.http.HeaderElementIterator;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.RequestLine;
@@ -47,6 +50,7 @@ import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
@@ -54,8 +58,12 @@ import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.message.BasicHeaderElementIterator;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 
@@ -64,41 +72,61 @@ import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.mcp.Data;
 
 public class ApacheHttpClient implements HttpClient {
-    
+
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
 
-    private static CloseableHttpClient httpClient;
+    private static CloseableHttpClient httpClient = null;
     private static String userAgentDefault = ClientIdentification.browserAgent.userAgent;
+
+    private static ConnectionKeepAliveStrategy keepAliveStrategy = new ConnectionKeepAliveStrategy() {
+        @Override
+        public long getKeepAliveDuration(HttpResponse response, HttpContext context) {
+            HeaderElementIterator it = new BasicHeaderElementIterator(response.headerIterator(HTTP.CONN_KEEP_ALIVE));
+            while (it.hasNext()) {
+                HeaderElement he = it.nextElement();
+                String param = he.getName();
+                String value = he.getValue();
+                if (value != null && param.equalsIgnoreCase("timeout")) {
+                    return Long.parseLong(value) * 1000;
+                }
+            }
+            return 60000;
+        }
+    };
 
     public static void initClient(String userAgent) {
         userAgentDefault = userAgent;
-        httpClient = HttpClients.custom()
+        HttpClientBuilder hcb = HttpClients.custom()
                 .useSystemProperties()
                 .setConnectionManager(getConnctionManager())
-                .setMaxConnPerRoute(2000)
-                .setMaxConnTotal(3000)
+                .setMaxConnPerRoute(5)
+                .setMaxConnTotal(Math.max(100, Runtime.getRuntime().availableProcessors() * 2))
                 .setUserAgent(userAgentDefault)
                 .setDefaultRequestConfig(ClientConnection.defaultRequestConfig)
-                .build();
+                //.setKeepAliveStrategy(DefaultConnectionKeepAliveStrategy.INSTANCE)
+                .setKeepAliveStrategy(keepAliveStrategy)
+                .setConnectionTimeToLive(60, TimeUnit.SECONDS);
+         httpClient = hcb.build();
     }
-    
+
     private int status_code;
     private String mime;
     private Map<String, List<String>> header;
     private String requestHeader, responseHeader;
     private byte[] content;
-    
+
     public ApacheHttpClient(String url, boolean head) throws IOException {
+        if (httpClient == null) initClient(ClientIdentification.browserAgent.userAgent);
         this.status_code = -1;
         this.content = null;
         this.mime = "";
         this.header = new HashMap<String, List<String>>();
-        
+
         HttpResponse httpResponse = null;
         HttpRequestBase request = head ? new HttpHead(url) : new HttpGet(url);
         request.setHeader("User-Agent", userAgentDefault);
         request.setHeader("Accept", "text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2");
-        
+
         // compute the request header (we do this to have a documentation later of what we did)
         StringBuffer sb = new StringBuffer();
         RequestLine status = request.getRequestLine();
@@ -108,7 +136,7 @@ public class ApacheHttpClient implements HttpClient {
         }
         sb.append(CRLF);
         this.requestHeader = sb.toString();
-        
+
         // do the request
         try {
             httpResponse = httpClient.execute(request);
@@ -150,7 +178,7 @@ public class ApacheHttpClient implements HttpClient {
                     }
                     Data.logger.info("ContentLoader loaded " + url);
                 }
-                
+
                 // read response header and set mime
                 if (this.status_code == 200 || this.status_code == 403) {
                     for (Header h: httpResponse.getAllHeaders()) {
@@ -160,7 +188,7 @@ public class ApacheHttpClient implements HttpClient {
                         if (h.getName().equals("Content-Type")) this.mime = h.getValue();
                     }
                 }
-                
+
                 // fix mime in case a font is assigned
                 int p = mime.indexOf(';');
                 if (p >= 0) {
@@ -168,7 +196,7 @@ public class ApacheHttpClient implements HttpClient {
                     mime = mime.substring(0, p);
                     if (charset.startsWith("; charset=")) charset = charset.substring(10);
                 }
-                
+
                 // compute response header string
                 sb.setLength(0);
                 sb.append(status.getProtocolVersion()).append(' ').append(this.status_code).append(CRLF);

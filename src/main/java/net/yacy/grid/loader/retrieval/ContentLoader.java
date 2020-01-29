@@ -215,7 +215,7 @@ public class ContentLoader {
 
         // bulk-store the crawler documents
         try {
-            CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments.values());
+            CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments);
         } catch (Throwable e) {
             Data.logger.error("", e);
         }
@@ -230,15 +230,7 @@ public class ContentLoader {
 
     }
 
-    private static String userAgentDefault = BrowserVersion.CHROME.getUserAgent();
-    static {
-        ApacheHttpClient.initClient(userAgentDefault);
-    }
-
     private static boolean loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
-        if (Memory.shortStatus()) {
-            ApacheHttpClient.initClient(userAgentDefault);
-        }
         Date loaddate = new Date();
 
         // first do a HEAD request to find the mime type

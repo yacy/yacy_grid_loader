@@ -6,12 +6,12 @@
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2.1 of the License, or (at your option) any later version.
- *  
+ *
  *  This library is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  Lesser General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with this program in the file lgpl21.txt
  *  If not, see <http://www.gnu.org/licenses/>.
@@ -22,9 +22,9 @@ package net.yacy.grid.loader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
 import javax.servlet.Servlet;
 
-import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -41,13 +41,12 @@ import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
-import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.tools.GitTool;
 import net.yacy.grid.tools.Memory;
 
 /**
  * The Loader main class
- * 
+ *
  * performance debugging:
  * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt
  * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt?count=100 *
@@ -56,7 +55,7 @@ public class Loader {
 
     private final static YaCyServices LOADER_SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json
     private final static String DATA_PATH = "data";
- 
+
     // define services
     @SuppressWarnings("unchecked")
     public final static Class<? extends Servlet>[] LOADER_SERVICES = new Class[]{
@@ -164,7 +163,7 @@ public class Loader {
             int crawlingDepth = crawl.getInt("crawlingDepth");
             int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
             boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
-            if (disableHeadless) loaderHeadless = false;
+            if (this.disableHeadless) loaderHeadless = false;
 
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
@@ -195,7 +194,7 @@ public class Loader {
                 }
                 if (storeToMessage) {
                     JSONArray actions = action.getEmbeddedActions();
-                    actions.forEach(a -> 
+                    actions.forEach(a ->
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
                     Data.logger.info("Loader.processAction stored asset " + targetasset + " into message");
@@ -217,7 +216,6 @@ public class Loader {
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
         Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH, false);
-        Data.logger.getLoggerRepository().setThreshold(Level.INFO);
 
         // initialize loader with user agent
         String userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent;

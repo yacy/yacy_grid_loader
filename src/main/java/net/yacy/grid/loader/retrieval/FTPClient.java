@@ -67,8 +67,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import net.yacy.grid.mcp.Logger;
 import net.yacy.grid.tools.Domains;
+import net.yacy.grid.tools.Logger;
 
 public class FTPClient {
 

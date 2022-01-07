@@ -48,9 +48,9 @@ import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.mcp.Data;
-import net.yacy.grid.mcp.Logger;
 import net.yacy.grid.tools.Classification.ContentDomain;
 import net.yacy.grid.tools.Digest;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {

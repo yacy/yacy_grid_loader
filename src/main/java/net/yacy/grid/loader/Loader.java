@@ -39,10 +39,10 @@ import net.yacy.grid.loader.retrieval.ContentLoader;
 import net.yacy.grid.mcp.AbstractBrokerListener;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
-import net.yacy.grid.mcp.Logger;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.GitTool;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.Memory;
 
 /**

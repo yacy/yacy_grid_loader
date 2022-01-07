@@ -69,7 +69,7 @@ import org.apache.http.util.EntityUtils;
 
 import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
-import net.yacy.grid.mcp.Logger;
+import net.yacy.grid.tools.Logger;
 
 public class ApacheHttpClient implements HttpClient {
 

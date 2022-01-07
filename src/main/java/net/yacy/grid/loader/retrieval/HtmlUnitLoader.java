@@ -42,7 +42,7 @@ import com.gargoylesoftware.htmlunit.html.parser.HTMLParserListener;
 import com.gargoylesoftware.htmlunit.javascript.JavaScriptErrorListener;
 import com.gargoylesoftware.htmlunit.util.UrlUtils;
 
-import net.yacy.grid.mcp.Logger;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.Memory;
 
 /**

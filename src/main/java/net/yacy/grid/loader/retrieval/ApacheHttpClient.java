@@ -6,12 +6,12 @@
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2.1 of the License, or (at your option) any later version.
- *  
+ *
  *  This library is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  Lesser General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with this program in the file lgpl21.txt
  *  If not, see <http://www.gnu.org/licenses/>.
@@ -69,7 +69,7 @@ import org.apache.http.util.EntityUtils;
 
 import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
-import net.yacy.grid.mcp.Data;
+import net.yacy.grid.tools.Logger;
 
 public class ApacheHttpClient implements HttpClient {
 
@@ -176,31 +176,31 @@ public class ApacheHttpClient implements HttpClient {
                     } catch (IOException e) {
                         throw e;
                     }
-                    Data.logger.info("ContentLoader loaded " + url);
+                    Logger.info(this.getClass(), "ContentLoader loaded " + url);
                 }
 
                 // read response header and set mime
                 if (this.status_code == 200 || this.status_code == 403) {
                     for (Header h: httpResponse.getAllHeaders()) {
-                        List<String> vals = header.get(h.getName());
-                        if (vals == null) { vals = new ArrayList<String>(); header.put(h.getName(), vals); }
+                        List<String> vals = this.header.get(h.getName());
+                        if (vals == null) { vals = new ArrayList<String>(); this.header.put(h.getName(), vals); }
                         vals.add(h.getValue());
                         if (h.getName().equals("Content-Type")) this.mime = h.getValue();
                     }
                 }
 
                 // fix mime in case a font is assigned
-                int p = mime.indexOf(';');
+                int p = this.mime.indexOf(';');
                 if (p >= 0) {
-                    String charset = p < mime.length() - 2 ? mime.substring(p + 2) : "";
-                    mime = mime.substring(0, p);
+                    String charset = p < this.mime.length() - 2 ? this.mime.substring(p + 2) : "";
+                    this.mime = this.mime.substring(0, p);
                     if (charset.startsWith("; charset=")) charset = charset.substring(10);
                 }
 
                 // compute response header string
                 sb.setLength(0);
                 sb.append(status.getProtocolVersion()).append(' ').append(this.status_code).append(CRLF);
-                for (Map.Entry<String, List<String>> headers: header.entrySet()) {
+                for (Map.Entry<String, List<String>> headers: this.header.entrySet()) {
                     for (String v: headers.getValue()) {
                         sb.append(headers.getKey()).append(": ").append(v).append(CRLF);
                     }
@@ -214,27 +214,27 @@ public class ApacheHttpClient implements HttpClient {
 
     @Override
     public int getStatusCode() {
-        return status_code;
+        return this.status_code;
     }
 
     @Override
     public String getMime() {
-        return mime;
+        return this.mime;
     }
 
     @Override
     public Map<String, List<String>> getHeader() {
-        return header;
+        return this.header;
     }
 
     @Override
     public String getRequestHeader() {
-        return requestHeader;
+        return this.requestHeader;
     }
 
     @Override
     public String getResponseHeader() {
-        return responseHeader;
+        return this.responseHeader;
     }
 
     @Override
@@ -260,7 +260,7 @@ public class ApacheHttpClient implements HttpClient {
                     .register("https", trustSelfSignedSocketFactory)
                     .build();
         } catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException e) {
-            Data.logger.warn("", e);
+            Logger.warn(e);
         }
 
         PoolingHttpClientConnectionManager cm = (socketFactoryRegistry != null) ?
@@ -270,10 +270,11 @@ public class ApacheHttpClient implements HttpClient {
         // twitter specific options
         cm.setMaxTotal(2000);
         cm.setDefaultMaxPerRoute(200);
-        
+
         return cm;
     }
     private static class TrustAllHostNameVerifier implements HostnameVerifier {
+        @Override
         public boolean verify(String hostname, SSLSession session) {
             return true;
         }

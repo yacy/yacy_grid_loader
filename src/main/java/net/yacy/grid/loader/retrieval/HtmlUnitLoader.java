@@ -42,7 +42,7 @@ import com.gargoylesoftware.htmlunit.html.parser.HTMLParserListener;
 import com.gargoylesoftware.htmlunit.javascript.JavaScriptErrorListener;
 import com.gargoylesoftware.htmlunit.util.UrlUtils;
 
-import net.yacy.grid.mcp.Data;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.Memory;
 
 /**
@@ -153,7 +153,7 @@ public class HtmlUnitLoader {
             client.getCache().clear();
             client.close();
             long mem2 = Memory.available();
-            Data.logger.info("HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes, after cleanup " + (mem2 - mem0) + " bytes");
+            Logger.info(this.getClass(), "HtmlUnitLoader loaded " + url + " - " + this.xml.length() + " bytes; used " + (mem1 - mem0) + " bytes, after cleanup " + (mem2 - mem0) + " bytes");
         } catch (Throwable e) {
             // there can be many reasons here, i.e. an error in javascript
             // we should always treat this as if the error is within the HTMLUnit, not the web page.

@@ -6,12 +6,12 @@
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2.1 of the License, or (at your option) any later version.
- *  
+ *
  *  This library is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  Lesser General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with this program in the file lgpl21.txt
  *  If not, see <http://www.gnu.org/licenses/>.
@@ -22,9 +22,9 @@ package net.yacy.grid.loader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
 import javax.servlet.Servlet;
 
-import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -41,13 +41,13 @@ import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
-import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.tools.GitTool;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.Memory;
 
 /**
  * The Loader main class
- * 
+ *
  * performance debugging:
  * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt
  * http://localhost:8200/yacy/grid/mcp/info/threaddump.txt?count=100 *
@@ -56,7 +56,7 @@ public class Loader {
 
     private final static YaCyServices LOADER_SERVICE = YaCyServices.loader; // check with http://localhost:8200/yacy/grid/mcp/status.json
     private final static String DATA_PATH = "data";
- 
+
     // define services
     @SuppressWarnings("unchecked")
     public final static Class<? extends Servlet>[] LOADER_SERVICES = new Class[]{
@@ -146,25 +146,25 @@ public class Loader {
 
             // check short memory status
             if (Memory.shortStatus()) {
-                Data.logger.info("Loader short memory status: assigned = " + Memory.assigned() + ", used = " + Memory.used());
+                Logger.info(this.getClass(), "Loader short memory status: assigned = " + Memory.assigned() + ", used = " + Memory.used());
             }
 
             // find out if we should do headless loading
             String crawlID = action.getStringAttr("id");
             if (crawlID == null || crawlID.length() == 0) {
-                Data.logger.info("Loader.processAction Fail: Action does not have an id: " + action.toString());
+                Logger.info(this.getClass(), "Loader.processAction Fail: Action does not have an id: " + action.toString());
                 return ActionResult.FAIL_IRREVERSIBLE;
             }
             JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
             if (crawl == null) {
-                Data.logger.info("Loader.processAction Fail: ID of Action not found in data: " + action.toString());
+                Logger.info(this.getClass(), "Loader.processAction Fail: ID of Action not found in data: " + action.toString());
                 return ActionResult.FAIL_IRREVERSIBLE;
             }
             int depth = action.getIntAttr("depth");
             int crawlingDepth = crawl.getInt("crawlingDepth");
             int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
             boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
-            if (disableHeadless) loaderHeadless = false;
+            if (this.disableHeadless) loaderHeadless = false;
 
             String targetasset = action.getStringAttr("targetasset");
             String threadnameprefix = processName + "-" + processNumber;
@@ -177,30 +177,30 @@ public class Loader {
                     b = cl.getContent();
                     actionResult = cl.getResult();
                 } catch (Throwable e) {
-                    Data.logger.warn("", e);
+                    Logger.warn(this.getClass(), e);
                     return ActionResult.FAIL_IRREVERSIBLE;
                 }
                 if (actionResult == ActionResult.FAIL_IRREVERSIBLE) {
-                    Data.logger.info("Loader.processAction FAILED processed message for targetasset " + targetasset);
+                    Logger.info(this.getClass(), "Loader.processAction FAILED processed message for targetasset " + targetasset);
                     return actionResult;
                 }
-                Data.logger.info("Loader.processAction SUCCESS processed message for targetasset " + targetasset);
+                Logger.info(this.getClass(), "Loader.processAction SUCCESS processed message for targetasset " + targetasset);
                 boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
                 try {
                     Data.gridStorage.store(targetasset, b);
-                    Data.logger.info("Loader.processAction stored asset " + targetasset);
+                    Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset);
                 } catch (Throwable e) {
-                    Data.logger.warn("Loader.processAction asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
+                    Logger.warn(this.getClass(), "Loader.processAction asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
                     storeToMessage = true;
                 }
                 if (storeToMessage) {
                     JSONArray actions = action.getEmbeddedActions();
-                    actions.forEach(a -> 
+                    actions.forEach(a ->
                         new SusiAction((JSONObject) a).setBinaryAsset(targetasset, b)
                     );
-                    Data.logger.info("Loader.processAction stored asset " + targetasset + " into message");
+                    Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset + " into message");
                 }
-                Data.logger.info("Loader.processAction processed message from queue and stored asset " + targetasset);
+                Logger.info(this.getClass(), "Loader.processAction processed message from queue and stored asset " + targetasset);
 
                 // success (has done something)
                 return actionResult;
@@ -217,7 +217,6 @@ public class Loader {
         services.addAll(Arrays.asList(MCP.MCP_SERVICES));
         services.addAll(Arrays.asList(LOADER_SERVICES));
         Service.initEnvironment(LOADER_SERVICE, services, DATA_PATH, false);
-        Data.logger.getLoggerRepository().setThreshold(Level.INFO);
 
         // initialize loader with user agent
         String userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName/*.yacyInternetCrawlerAgentName*/).userAgent;
@@ -235,8 +234,8 @@ public class Loader {
         new Thread(brokerListener).start();
 
         // start server
-        Data.logger.info("Loader.main started Loader");
-        Data.logger.info(new GitTool().toString());
+        Logger.info("Loader.main started Loader");
+        Logger.info(new GitTool().toString());
         Service.runService(null);
         brokerListener.terminate();
     }

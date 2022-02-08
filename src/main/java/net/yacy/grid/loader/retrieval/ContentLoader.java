@@ -6,12 +6,12 @@
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2.1 of the License, or (at your option) any later version.
- *  
+ *
  *  This library is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  Lesser General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with this program in the file lgpl21.txt
  *  If not, see <http://www.gnu.org/licenses/>.
@@ -41,8 +41,6 @@ import org.json.JSONArray;
 import org.jwat.warc.WarcWriter;
 import org.jwat.warc.WarcWriterFactory;
 
-import com.gargoylesoftware.htmlunit.BrowserVersion;
-
 import ai.susi.mind.SusiAction;
 import ai.susi.mind.SusiAction.RenderType;
 import net.yacy.grid.io.index.CrawlerDocument;
@@ -52,7 +50,7 @@ import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.mcp.Data;
 import net.yacy.grid.tools.Classification.ContentDomain;
 import net.yacy.grid.tools.Digest;
-import net.yacy.grid.tools.Memory;
+import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
@@ -61,14 +59,14 @@ public class ContentLoader {
     private ActionResult result;
 
     public ContentLoader(
-            SusiAction action, JSONArray data, boolean compressed, String threadnameprefix, 
+            SusiAction action, JSONArray data, boolean compressed, String threadnameprefix,
             final String id, final int depth, final int crawlingDepth, final boolean loaderHeadless, final int priority) {
         this.content = new byte[0];
         this.result = ActionResult.FAIL_IRREVERSIBLE;
 
         // this must have a loader action
         if (action.getRenderType() != RenderType.loader) {
-            return; 
+            return;
         }
 
         // extract urls
@@ -96,12 +94,12 @@ public class ContentLoader {
             Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, id, depth, crawlingDepth, loaderHeadless, priority);
             this.result = ActionResult.SUCCESS;
             errors.forEach((u, c) -> {
-                Data.logger.debug("Loader - cannot load: " + u + " - " + c);
+                Logger.debug(this.getClass(), "Loader - cannot load: " + u + " - " + c);
                 if (c == ActionResult.FAIL_RETRY && this.result == ActionResult.SUCCESS) this.result = ActionResult.FAIL_RETRY;
                 if (c == ActionResult.FAIL_IRREVERSIBLE) this.result = ActionResult.FAIL_IRREVERSIBLE;
             });
         } catch (IOException e) {
-            Data.logger.warn("ContentLoader.load init problem", e);
+            Logger.warn(this.getClass(), "ContentLoader.load init problem", e);
         } finally {
             if (out != null) try {out.close();} catch (IOException e) {}
         }
@@ -119,7 +117,7 @@ public class ContentLoader {
                 return;
             } catch (IOException e) {
                 // this should not happen since we had been able to open the file
-                Data.logger.warn("", e);
+                Logger.warn(this.getClass(), e);
                 return; // fail irreversible
             }
         }
@@ -127,11 +125,11 @@ public class ContentLoader {
 
 
     public byte[] getContent() {
-        return content;
+        return this.content;
     }
 
     public ActionResult getResult() {
-        return result;
+        return this.result;
     }
 
     private final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
@@ -208,7 +206,7 @@ public class ContentLoader {
                     }
                 }
             } catch (Throwable e) {
-                Data.logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
+                Logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
                 errors.put((String) url, ActionResult.FAIL_IRREVERSIBLE);
             }
         });
@@ -217,7 +215,7 @@ public class ContentLoader {
         try {
             CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments);
         } catch (Throwable e) {
-            Data.logger.error("", e);
+            Logger.error(e);
         }
         return errors;
     }
@@ -250,7 +248,7 @@ public class ContentLoader {
             if (cause != null && cause.indexOf("404") >= 0) {
                 throw new IOException("" + url + " fail: " + cause);
             }
-            Data.logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
+            Logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
         }
 
         if (content == null) {
@@ -273,7 +271,7 @@ public class ContentLoader {
         r.write(content);
         content = r.toByteArray();
 
-        Data.logger.info("ContentLoader writing WARC for " + url + " - " + content.length + " bytes");
+        Logger.info("ContentLoader writing WARC for " + url + " - " + content.length + " bytes");
         JwatWarcWriter.writeResponse(warcWriter, url, null, loaddate, null, null, content);
 
         return true;

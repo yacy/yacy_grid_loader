@@ -1,5 +1,15 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.4'
+    }
+}
+
 plugins {
-    id 'com.github.johnrengelman.shadow' version '5.0.0'
+    id 'com.github.johnrengelman.shadow' version '5.1.0'
 }
 
 apply plugin: 'java'
@@ -15,6 +25,7 @@ sourceSets {
     }
 }
 
+archivesBaseName = 'yacy_grid_loader'
 mainClassName = "net.yacy.grid.loader.Loader"
 applicationDefaultJvmArgs = ["-Xmx8g"]
 
@@ -32,37 +43,41 @@ tasks.withType(JavaCompile) {
 
 repositories {
      mavenCentral()
-     jcenter()
 }
-
-dependencies {
-    compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.+'
-    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.15.+'
-    compile group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.+'
-    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.4.+'
-    compile group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.+'
-    compile group: 'javax.servlet', name: 'javax.servlet-api', version: '4.+'
-    compile group: 'org.mapdb', name: 'mapdb', version: '3.+'
-    compile group: 'com.rabbitmq', name: 'amqp-client', version: '5.+'
-    compile group: 'commons-net', name: 'commons-net', version: '3.+'
-    compile group: 'jcifs', name: 'jcifs', version: '1.+'
-    compile group: 'org.elasticsearch.client', name: 'transport', version: '6.8.+'
-    compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '5.+'
-    compile group: 'com.hazelcast', name: 'hazelcast', version: '5.+'
-    compile group: 'io.minio', name: 'minio', version: '8.3.+'
-
-    compile group: 'org.jwat', name: 'jwat-warc', version: '1.+'
 
 jar {
     manifest {
-        attributes "Main-Class": "${project.mainClassName}"
+        attributes 'Main-Class': 'net.yacy.grid.loader.Loader'
     }
 }
 
 shadowJar {
-   baseName = 'shadow'
-   classifier = null
-   version = version
+    mergeServiceFiles()
+
+    from('conf') {
+        into 'conf'
+    }
 }
-    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.54.0'
+assemble.dependsOn shadowJar
+
+
+
+dependencies {
+    compile group: 'com.hazelcast', name: 'hazelcast', version: '4.2.+'
+    compile group: 'com.rabbitmq', name: 'amqp-client', version: '5.+'
+    compile group: 'commons-net', name: 'commons-net', version: '3.+'
+    compile group: 'io.minio', name: 'minio', version: '8.3.+'
+    compile group: 'javax.servlet', name: 'javax.servlet-api', version: '4.+'
+    compile group: 'jcifs', name: 'jcifs', version: '1.+'
+    compile group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.+'
+    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.4.+'
+    compile group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.+'
+    compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '5.+'
+    compile group: 'org.elasticsearch.client', name: 'transport', version: '6.8.+'
+    compile group: 'org.mapdb', name: 'mapdb', version: '3.+'
+    compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.+'
+    compile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.+'
+
+    compile group: 'net.sourceforge.htmlunit', name: 'htmlunit', version: '2.56.0'
+    compile group: 'org.jwat', name: 'jwat-warc', version: '1.+'
 }

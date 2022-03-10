@@ -47,7 +47,7 @@ import net.yacy.grid.io.index.CrawlerDocument;
 import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.BrokerListener.ActionResult;
-import net.yacy.grid.mcp.Data;
+import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.Classification.ContentDomain;
 import net.yacy.grid.tools.Digest;
 import net.yacy.grid.tools.Logger;
@@ -59,7 +59,7 @@ public class ContentLoader {
     private ActionResult result;
 
     public ContentLoader(
-            SusiAction action, JSONArray data, boolean compressed, String threadnameprefix,
+            final SusiAction action, final JSONArray data, final boolean compressed, final String threadnameprefix,
             final String id, final int depth, final int crawlingDepth, final boolean loaderHeadless, final int priority) {
         this.content = new byte[0];
         this.result = ActionResult.FAIL_IRREVERSIBLE;
@@ -70,10 +70,10 @@ public class ContentLoader {
         }
 
         // extract urls
-        JSONArray urls = action.getArrayAttr("urls");
-        List<String> urlss = new ArrayList<>();
+        final JSONArray urls = action.getArrayAttr("urls");
+        final List<String> urlss = new ArrayList<>();
         urls.forEach(u -> urlss.add(((String) u)));
-        byte[] warcPayload = data.toString(2).getBytes(StandardCharsets.UTF_8);
+        final byte[] warcPayload = data.toString(2).getBytes(StandardCharsets.UTF_8);
 
         // start loading
         Thread.currentThread().setName(threadnameprefix + " loading " + urlss.toString());
@@ -85,23 +85,23 @@ public class ContentLoader {
             tmp = createTempFile("yacygridloader", ".warc");
             //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
             out = new BufferedOutputStream(new FileOutputStream(tmp));
-        } catch (IOException e) {
+        } catch (final IOException e) {
             tmp = null;
             out = new ByteArrayOutputStream();
         }
         try {
-            WarcWriter ww = ContentLoader.initWriter(out, warcPayload, compressed);
-            Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, id, depth, crawlingDepth, loaderHeadless, priority);
+            final WarcWriter ww = ContentLoader.initWriter(out, warcPayload, compressed);
+            final Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, id, depth, crawlingDepth, loaderHeadless, priority);
             this.result = ActionResult.SUCCESS;
             errors.forEach((u, c) -> {
                 Logger.debug(this.getClass(), "Loader - cannot load: " + u + " - " + c);
                 if (c == ActionResult.FAIL_RETRY && this.result == ActionResult.SUCCESS) this.result = ActionResult.FAIL_RETRY;
                 if (c == ActionResult.FAIL_IRREVERSIBLE) this.result = ActionResult.FAIL_IRREVERSIBLE;
             });
-        } catch (IOException e) {
+        } catch (final IOException e) {
             Logger.warn(this.getClass(), "ContentLoader.load init problem", e);
         } finally {
-            if (out != null) try {out.close();} catch (IOException e) {}
+            if (out != null) try {out.close();} catch (final IOException e) {}
         }
         if (out instanceof ByteArrayOutputStream) {
             this.content = ((ByteArrayOutputStream) out).toByteArray();
@@ -115,7 +115,7 @@ public class ContentLoader {
                 tmp.delete();
                 if (tmp.exists()) tmp.deleteOnExit();
                 return;
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 // this should not happen since we had been able to open the file
                 Logger.warn(this.getClass(), e);
                 return; // fail irreversible
@@ -134,14 +134,14 @@ public class ContentLoader {
 
     private final static SimpleDateFormat millisFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS", Locale.US);
     private final static AtomicLong createTempFileCounter = new AtomicLong(0);
-    public static File createTempFile(String prefix, String suffix) throws IOException {
-        String tmpprefix = prefix + "-" + millisFormat.format(new Date()) + Long.toString(createTempFileCounter.getAndIncrement());
-        File tmp = File.createTempFile(tmpprefix, suffix);
+    public static File createTempFile(final String prefix, final String suffix) throws IOException {
+        final String tmpprefix = prefix + "-" + millisFormat.format(new Date()) + Long.toString(createTempFileCounter.getAndIncrement());
+        final File tmp = File.createTempFile(tmpprefix, suffix);
         return tmp;
     }
 
-    private static WarcWriter initWriter(OutputStream out, byte[] payload, boolean compressed) throws IOException {
-        WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
+    private static WarcWriter initWriter(final OutputStream out, final byte[] payload, final boolean compressed) throws IOException {
+        final WarcWriter ww = WarcWriterFactory.getWriter(out, compressed);
         JwatWarcWriter.writeWarcinfo(ww, new Date(), null, null, payload);
         return ww;
     }
@@ -158,31 +158,31 @@ public class ContentLoader {
         });
 
         // prepare map with ids and load crawlerDocuments
-        Map<String, String> urlmap = new HashMap<>();
+        final Map<String, String> urlmap = new HashMap<>();
         fixedURLs.forEach(url -> urlmap.put(url, Digest.encodeMD5Hex(url)));
-        Map<String, CrawlerDocument> crawlerDocuments = CrawlerDocument.loadBulk(Data.gridIndex, urlmap.values());
+        final Map<String, CrawlerDocument> crawlerDocuments = CrawlerDocument.loadBulk(Service.instance.config, Service.instance.config.gridIndex, urlmap.values());
 
         // load content
-        Map<String, ActionResult> errors = new LinkedHashMap<>();
+        final Map<String, ActionResult> errors = new LinkedHashMap<>();
         fixedURLs.forEach(url -> {
 
             // do loader throttling here
             long throttling = 501;
             try {
-                throttling = Data.gridControl.checkThrottling(id, url, depth, crawlingDepth, loaderHeadless, priority);
-            } catch (IOException e1) {}
+                throttling = Service.instance.config.gridControl.checkThrottling(id, url, depth, crawlingDepth, loaderHeadless, priority);
+            } catch (final IOException e1) {}
             Thread.currentThread().setName(threadName + " loading " + url.toString() + ", throttling = " + throttling);
-            try {Thread.sleep(throttling);} catch (InterruptedException e) {}
+            try {Thread.sleep(throttling);} catch (final InterruptedException e) {}
 
             // start loading
             try {
                 // load entry from crawler index
-                String urlid = urlmap.get(url);
-                CrawlerDocument crawlerDocument = crawlerDocuments.get(urlid);
+                final String urlid = urlmap.get(url);
+                final CrawlerDocument crawlerDocument = crawlerDocuments.get(urlid);
                 //assert crawlerDocument != null;
 
                 // load content from the network
-                long t = System.currentTimeMillis();
+                final long t = System.currentTimeMillis();
                 try {
                     boolean success = false;
                     if (url.startsWith("http")) success = loadHTTP(warcWriter, url, threadName, loaderHeadless);
@@ -191,60 +191,60 @@ public class ContentLoader {
 
                     // write success status
                     if (success && crawlerDocument != null) {
-                        long load_time = System.currentTimeMillis() - t;
+                        final long load_time = System.currentTimeMillis() - t;
                         crawlerDocument.setStatus(Status.loaded).setStatusDate(new Date()).setComment("load time: " + load_time + " milliseconds");
                         // crawlerDocument.store(Data.gridIndex); we bulk-store this later
                         // check with http://localhost:9200/crawler/_search?q=status_s:loaded
                     }
-                } catch (IOException e) {
+                } catch (final IOException e) {
                     // write fail status
                     if (crawlerDocument != null) {
-                        long load_time = System.currentTimeMillis() - t;
+                        final long load_time = System.currentTimeMillis() - t;
                         crawlerDocument.setStatus(Status.load_failed).setStatusDate(new Date()).setComment("load fail: '" + e.getMessage() + "' after " + load_time + " milliseconds");
                         // crawlerDocument.store(Data.gridIndex); we bulk-store this later
                         // check with http://localhost:9200/crawler/_search?q=status_s:load_failed
                     }
                 }
-            } catch (Throwable e) {
+            } catch (final Throwable e) {
                 Logger.warn("ContentLoader cannot load " + url + " - " + e.getMessage());
-                errors.put((String) url, ActionResult.FAIL_IRREVERSIBLE);
+                errors.put(url, ActionResult.FAIL_IRREVERSIBLE);
             }
         });
 
         // bulk-store the crawler documents
         try {
-            CrawlerDocument.storeBulk(Data.gridIndex, crawlerDocuments);
-        } catch (Throwable e) {
+            CrawlerDocument.storeBulk(Service.instance.config, Service.instance.config.gridIndex, crawlerDocuments);
+        } catch (final Throwable e) {
             Logger.error(e);
         }
         return errors;
     }
 
-    private static void loadFTP(WarcWriter warcWriter, String url) throws IOException {
+    private static void loadFTP(final WarcWriter warcWriter, final String url) throws IOException {
 
     }
 
-    private static void loadSMB(WarcWriter warcWriter, String url) throws IOException {
+    private static void loadSMB(final WarcWriter warcWriter, final String url) throws IOException {
 
     }
 
     private static boolean loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
-        Date loaddate = new Date();
+        final Date loaddate = new Date();
 
         // first do a HEAD request to find the mime type
         ApacheHttpClient ac = new ApacheHttpClient(url, true);
 
         // here we know the content type
         byte[] content = null;
-        MultiProtocolURL u = new MultiProtocolURL(url);
+        final MultiProtocolURL u = new MultiProtocolURL(url);
         if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {
             // use htmlunit to load this
-            HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
-            String xml = htmlUnitLoader.getXml();
+            final HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
+            final String xml = htmlUnitLoader.getXml();
             content = xml.getBytes(StandardCharsets.UTF_8);
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
             // do nothing here, input stream is not set
-            String cause = e == null ? "null" : e.getMessage();
+            final String cause = e == null ? "null" : e.getMessage();
             if (cause != null && cause.indexOf("404") >= 0) {
                 throw new IOException("" + url + " fail: " + cause);
             }
@@ -256,7 +256,7 @@ public class ContentLoader {
             // or it was html and HtmlUnit has failed - we retry the normal way here.
 
             ac = new ApacheHttpClient(url, false);
-            int status = ac.getStatusCode();
+            final int status = ac.getStatusCode();
             if (status != 200) return false;
             content = ac.getContent();
         }
@@ -266,7 +266,7 @@ public class ContentLoader {
         JwatWarcWriter.writeRequest(warcWriter, url, null, loaddate, null, null, ac.getRequestHeader().getBytes(StandardCharsets.UTF_8));
 
         // add the request header before the content
-        ByteArrayOutputStream r = new ByteArrayOutputStream();
+        final ByteArrayOutputStream r = new ByteArrayOutputStream();
         r.write(ac.getResponseHeader().toString().getBytes(StandardCharsets.UTF_8));
         r.write(content);
         content = r.toByteArray();

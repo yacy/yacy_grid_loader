@@ -153,7 +153,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
                 return actionResult;
             }
             Logger.info(this.getClass(), "Loader.processAction SUCCESS processed message for targetasset " + targetasset);
-            boolean storeToMessage = false; // debug version for now: always true TODO: set to false later
+            boolean storeToMessage = true; // debug version for now: always true TODO: set to false later
             try {
                 Service.instance.config.gridStorage.store(targetasset, b);
                 Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset);

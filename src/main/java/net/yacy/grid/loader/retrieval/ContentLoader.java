@@ -167,7 +167,7 @@ public class ContentLoader {
         fixedURLs.forEach(url -> {
 
             // do loader throttling here
-            long throttling = 501;
+            long throttling = 250;
             try {
                 throttling = Service.instance.config.gridControl.checkThrottling(id, url, depth, crawlingDepth, loaderHeadless, priority);
             } catch (final IOException e1) {}

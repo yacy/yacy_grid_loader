@@ -154,12 +154,15 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
             }
             Logger.info(this.getClass(), "Loader.processAction SUCCESS processed message for targetasset " + targetasset);
             boolean storeToMessage = true; // debug version for now: always true TODO: set to false later
-            try {
-                Service.instance.config.gridStorage.store(targetasset, b);
-                Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset);
-            } catch (final Throwable e) {
-                Logger.warn(this.getClass(), "Loader.processAction asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
-                storeToMessage = true;
+            // ATTENTION: we should not send binaries larger than 512MB to RabbitMQ, see https://github.com/rabbitmq/rabbitmq-server/issues/147#issuecomment-470882099
+            if (!storeToMessage) {
+                try {
+                    Service.instance.config.gridStorage.store(targetasset, b);
+                    Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset);
+                } catch (final Throwable e) {
+                    Logger.warn(this.getClass(), "Loader.processAction asset " + targetasset + " could not be stored, carrying the asset within the next action", e);
+                    storeToMessage = true;
+                }
             }
             if (storeToMessage) {
                 final JSONArray actions = action.getEmbeddedActions();

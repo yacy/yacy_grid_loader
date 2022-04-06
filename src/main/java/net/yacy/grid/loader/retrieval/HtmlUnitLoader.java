@@ -153,7 +153,7 @@ public class HtmlUnitLoader {
             );
         }
 
-        return String.format("%s\n", header);
+        return String.format("%s\n\n", header);
     }
 
     private String parseResponseHeaders(int statusCode, List<NameValuePair> headers) {
@@ -168,7 +168,7 @@ public class HtmlUnitLoader {
             );
         }
 
-        return String.format("%s\n", header);
+        return String.format("%s\n\n", header);
     }
 
     public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status

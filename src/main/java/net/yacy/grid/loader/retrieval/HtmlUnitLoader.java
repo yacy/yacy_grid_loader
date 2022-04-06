@@ -22,12 +22,15 @@ package net.yacy.grid.loader.retrieval;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import com.gargoylesoftware.css.parser.CSSErrorHandler;
 import com.gargoylesoftware.css.parser.CSSException;
 import com.gargoylesoftware.css.parser.CSSParseException;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.HttpMethod;
 import com.gargoylesoftware.htmlunit.BrowserVersion.BrowserVersionBuilder;
 import com.gargoylesoftware.htmlunit.IncorrectnessListener;
 import com.gargoylesoftware.htmlunit.Page;
@@ -40,6 +43,7 @@ import com.gargoylesoftware.htmlunit.WebWindow;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.parser.HTMLParserListener;
 import com.gargoylesoftware.htmlunit.javascript.JavaScriptErrorListener;
+import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.gargoylesoftware.htmlunit.util.UrlUtils;
 
 import net.yacy.grid.tools.Logger;
@@ -119,7 +123,7 @@ public class HtmlUnitLoader {
         return browserBuilder;
     }
 
-    private String url, xml;
+    private String url, xml, responseHeaders, requestHeaders;
 
     public String getUrl() {
         return this.url;
@@ -127,6 +131,44 @@ public class HtmlUnitLoader {
 
     public String getXml() {
         return this.xml;
+    }
+
+    public String getResponseHeaders() {
+        return this.responseHeaders;
+    }
+
+    public String getRequestHeaders() {
+        return this.requestHeaders;
+    }
+
+    private String parseRequestHeaders(HttpMethod httpMethod, String url, Map<String, String> headers) {
+        String header = String.format("%s %s HTTP/1.1", httpMethod.toString(), url);
+
+        for (Map.Entry<String,String> entry : headers.entrySet()) {
+            header = String.format(
+                "%s\n%s: %s",
+                header,
+                entry.getKey(),
+                entry.getValue()
+            );
+        }
+
+        return String.format("%s\n", header);
+    }
+
+    private String parseResponseHeaders(int statusCode, List<NameValuePair> headers) {
+        String header = String.format("HTTP/1.1 %d", statusCode);
+
+        for (NameValuePair nameValuePair : headers) {
+            header = String.format(
+                "%s\n%s: %s",
+                header,
+                nameValuePair.getName(),
+                nameValuePair.getValue()
+            );
+        }
+
+        return String.format("%s\n", header);
     }
 
     public HtmlUnitLoader(String url, String windowName) throws IOException {// check short memory status
@@ -141,6 +183,18 @@ public class HtmlUnitLoader {
             WebRequest webRequest = new WebRequest(uurl, htmlAcceptHeader, null);
             page = client.getPage(webWindow, webRequest); // com.gargoylesoftware.htmlunit.xml.XmlPage cannot be cast to com.gargoylesoftware.htmlunit.html.HtmlPage
             this.xml = page.asXml();
+
+            this.requestHeaders = this.parseRequestHeaders(
+                webRequest.getHttpMethod(),
+                url,
+                webRequest.getAdditionalHeaders()
+            );
+
+            this.responseHeaders = this.parseResponseHeaders(
+                page.getWebResponse().getStatusCode(),
+                page.getWebResponse().getResponseHeaders()
+            );
+
             long mem1 = Memory.available();
             Page htmlpage = webWindow.getEnclosedPage();
             htmlpage.cleanUp();

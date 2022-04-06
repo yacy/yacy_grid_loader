@@ -236,11 +236,19 @@ public class ContentLoader {
 
         // here we know the content type
         byte[] content = null;
+
+        String requestHeaders = ac.getRequestHeader().toString();
+        String responseHeaders = ac.getResponseHeader().toString();
+
         final MultiProtocolURL u = new MultiProtocolURL(url);
         if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {
             // use htmlunit to load this
             final HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
             final String xml = htmlUnitLoader.getXml();
+
+            requestHeaders = htmlUnitLoader.getRequestHeaders();
+            responseHeaders = htmlUnitLoader.getResponseHeaders();
+
             content = xml.getBytes(StandardCharsets.UTF_8);
         } catch (final Throwable e) {
             // do nothing here, input stream is not set
@@ -258,16 +266,20 @@ public class ContentLoader {
             ac = new ApacheHttpClient(url, false);
             final int status = ac.getStatusCode();
             if (status != 200) return false;
+
+            requestHeaders = ac.getRequestHeader().toString();
+            responseHeaders = ac.getResponseHeader().toString();
+
             content = ac.getContent();
         }
 
         if (content == null || content.length == 0) return false;
 
-        JwatWarcWriter.writeRequest(warcWriter, url, null, loaddate, null, null, ac.getRequestHeader().getBytes(StandardCharsets.UTF_8));
+        JwatWarcWriter.writeRequest(warcWriter, url, null, loaddate, null, null, requestHeaders.getBytes(StandardCharsets.UTF_8));
 
         // add the request header before the content
         final ByteArrayOutputStream r = new ByteArrayOutputStream();
-        r.write(ac.getResponseHeader().toString().getBytes(StandardCharsets.UTF_8));
+        r.write(responseHeaders.getBytes(StandardCharsets.UTF_8));
         r.write(content);
         content = r.toByteArray();
 

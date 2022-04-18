@@ -257,7 +257,7 @@ public class FTPClient {
                     } finally {
                         try {
 							in.close();
-						} catch (IOException ioe) {
+						} catch (final IOException ioe) {
 							Logger.warn("Could not close input stream on file " + f);
 						}
                     }
@@ -947,7 +947,7 @@ public class FTPClient {
             return true;
         }
         final String[] name = this.currentLocalPath.list();
-        for (String element : name) {
+        for (final String element : name) {
             Logger.info(ls(new File(this.currentLocalPath, element)));
         }
         return true;
@@ -1972,7 +1972,7 @@ public class FTPClient {
 
     private void send(final String buf) throws IOException {
         if (this.clientOutput == null) return;
-        byte[] b = buf.getBytes(StandardCharsets.UTF_8);
+        final byte[] b = buf.getBytes(StandardCharsets.UTF_8);
         this.clientOutput.write(b, 0, b.length);
         this.clientOutput.write('\r');
         this.clientOutput.write('\n');
@@ -2518,7 +2518,7 @@ public class FTPClient {
             c.cmd = new String[] { "exit" };
             c.EXIT();
             return v;
-        } catch (final java.security.AccessControlException e) {
+        } catch (final RuntimeException e) {
             return null;
         } catch (final IOException e) {
             return null;
@@ -2534,7 +2534,7 @@ public class FTPClient {
             c.exec("ls", true);
             c.exec("close", false);
             c.exec("exit", false);
-        } catch (final java.security.AccessControlException e) {
+        } catch (final RuntimeException e) {
         }
     }
 
@@ -2585,7 +2585,7 @@ public class FTPClient {
 	 * @throws IOException
 	 *             when a error occurred
 	 */
-    private static void sitelist(final FTPClient ftpClient, String path, final LinkedBlockingQueue<entryInfo> queue, int depth) {
+    private static void sitelist(final FTPClient ftpClient, String path, final LinkedBlockingQueue<entryInfo> queue, final int depth) {
         List<String> list;
         try {
             list = ftpClient.list(path, true);
@@ -2781,7 +2781,7 @@ public class FTPClient {
             c.exec("get " + remoteFile + " " + localPath.getAbsoluteFile().toString(), false);
             c.exec("close", false);
             c.exec("exit", false);
-        } catch (final java.security.AccessControlException e) {
+        } catch (final RuntimeException e) {
         }
     }
 
@@ -2911,7 +2911,7 @@ public class FTPClient {
         		} else {
         			printHelp();
         		}
-        } catch (Exception e) {
+        } catch (final Exception e) {
 
         }
     }

@@ -22,7 +22,7 @@ After loading of content the loader will push back results to the MCP storage an
 another message on the MCP message queue to process the loaded content.
 
 ## Installation: Download, Build, Run
-At this time, yacy_grid_parser is not provided in compiled form, you easily build it yourself. It's not difficult and done in one minute! The source code is hosted at https://github.com/yacy/yacy_grid_loader, you can download it and run loklak with:
+At this time, yacy_grid_parser is not provided in compiled form, you easily build it yourself. It's not difficult and done in one minute! The source code is hosted at https://github.com/yacy/yacy_grid_loader, you can download and run it with:
 
     > git clone --recursive https://github.com/yacy/yacy_grid_loader.git
 

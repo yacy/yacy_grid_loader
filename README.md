@@ -36,7 +36,7 @@ To build and start the loader, run
     > cd yacy_grid_loader
     > gradle run
 
-Please read also https://github.com/yacy/yacy_grid_mcp/README.md for further details.
+Please read also https://github.com/yacy/yacy_grid_mcp/blob/master/README.md for further details.
 
 
 ## Contribute

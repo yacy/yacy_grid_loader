@@ -22,7 +22,6 @@ package net.yacy.grid.loader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 
 import javax.servlet.Servlet;
 
@@ -132,14 +131,13 @@ public class Loader {
         // run in headless mode
         System.setProperty("java.awt.headless", "true"); // no awt used here so we can switch off that stuff
 
-        // prepare configuration
-        final Properties sysprops = System.getProperties(); // system properties
-        System.getenv().forEach((k,v) -> {
-            if (k.startsWith("YACYGRID_")) sysprops.put(k.substring(9).replace('_', '.'), v);
-        }); // add also environment variables
+        // Debug Info
+        boolean assertionenabled = false;
+        assert (assertionenabled = true) == true; // compare to true to remove warning: "Possible accidental assignement"
+        if (assertionenabled) Logger.info("Asserts are enabled");
 
         // first greeting
-        Logger.info("Loader started!");
+        Logger.info("YaCy Grid Loader started!");
         Logger.info(new GitTool().toString());
 
         // run application with cron
@@ -149,7 +147,7 @@ public class Loader {
         cron.cycle();
 
         // this line is reached if the cron process was shut down
-        Logger.info("Loader terminated");
+        Logger.info("YaCy Grid Loader terminated");
     }
 
 }

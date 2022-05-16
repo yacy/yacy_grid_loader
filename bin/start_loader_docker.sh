@@ -3,7 +3,7 @@ cd "`dirname $0`"
 
 bindhost="0.0.0.0"
 callhost=`hostname`.local
-appname="YaCy Grid Crawler"
+appname="YaCy Grid Loader"
 containername=yacy-grid-loader
 imagename=${containername}
 

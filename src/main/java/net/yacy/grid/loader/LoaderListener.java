@@ -135,6 +135,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
         if (this.disableHeadless) loaderHeadless = false;
 
         final String targetasset = action.getStringAttr("targetasset");
+        final boolean archivewarc = action.getBooleanAttr("archivewarc");
         final String threadnameprefix = processName + "-" + processNumber;
         Thread.currentThread().setName(threadnameprefix + " targetasset=" + targetasset);
         if (targetasset != null && targetasset.length() > 0) {
@@ -155,7 +156,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
             Logger.info(this.getClass(), "Loader.processAction SUCCESS processed message for targetasset " + targetasset);
             boolean storeToMessage = true; // debug version for now: always true TODO: set to false later
             // ATTENTION: we should not send binaries larger than 512MB to RabbitMQ, see https://github.com/rabbitmq/rabbitmq-server/issues/147#issuecomment-470882099
-            if (!storeToMessage) {
+            if (!storeToMessage || (archivewarc && Service.instance.config.gridStorage.isS3Connected())) {
                 try {
                     Service.instance.config.gridStorage.store(targetasset, b);
                     Logger.info(this.getClass(), "Loader.processAction stored asset " + targetasset);

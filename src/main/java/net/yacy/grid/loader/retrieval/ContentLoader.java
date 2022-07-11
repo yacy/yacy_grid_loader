@@ -99,7 +99,7 @@ public class ContentLoader {
                 if (c == ActionResult.FAIL_IRREVERSIBLE) this.result = ActionResult.FAIL_IRREVERSIBLE;
             });
         } catch (final IOException e) {
-            Logger.warn(this.getClass(), "ContentLoader.load init problem", e);
+            Logger.warn(this.getClass(), "ContentLoader WARC writer init problem", e);
         } finally {
             if (out != null) try {out.close();} catch (final IOException e) {}
         }

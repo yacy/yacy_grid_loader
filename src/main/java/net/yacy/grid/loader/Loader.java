@@ -36,7 +36,6 @@ import net.yacy.grid.mcp.MCP;
 import net.yacy.grid.mcp.Service;
 import net.yacy.grid.tools.CronBox;
 import net.yacy.grid.tools.CronBox.Telemetry;
-import net.yacy.grid.tools.GitTool;
 import net.yacy.grid.tools.Logger;
 
 /**
@@ -68,7 +67,6 @@ public class Loader {
 
         public Application() {
             Logger.info("Starting Crawler Application...");
-            Logger.info(new GitTool().toString());
 
             // initialize configuration
             final List<Class<? extends Servlet>> services = new ArrayList<>();
@@ -138,7 +136,6 @@ public class Loader {
 
         // first greeting
         Logger.info("YaCy Grid Loader started!");
-        Logger.info(new GitTool().toString());
 
         // run application with cron
         final long cycleDelay = Long.parseLong(System.getProperty("YACYGRID_LOADER_CYCLEDELAY", "" + Long.MAX_VALUE)); // by default, run only in one genesis thread

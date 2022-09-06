@@ -232,7 +232,7 @@ public class ContentLoader {
         final Date loaddate = new Date();
 
         // first do a HEAD request to find the mime type
-        ApacheHttpClient ac = new ApacheHttpClient(url, true);
+        LoaderClientConnection ac = new LoaderClientConnection(url, true);
 
         // here we know the content type
         byte[] content = null;
@@ -263,7 +263,7 @@ public class ContentLoader {
             // do another http request. This can either happen because mime type is not html
             // or it was html and HtmlUnit has failed - we retry the normal way here.
 
-            ac = new ApacheHttpClient(url, false);
+            ac = new LoaderClientConnection(url, false);
             final int status = ac.getStatusCode();
             if (status != 200) return false;
 

@@ -26,10 +26,11 @@ import java.util.List;
 import javax.servlet.Servlet;
 
 import net.yacy.grid.YaCyServices;
+import net.yacy.grid.http.ClientConnection;
 import net.yacy.grid.http.ClientIdentification;
 import net.yacy.grid.loader.api.LoaderService;
 import net.yacy.grid.loader.api.ProcessService;
-import net.yacy.grid.loader.retrieval.ApacheHttpClient;
+import net.yacy.grid.loader.retrieval.LoaderClientConnection;
 import net.yacy.grid.mcp.BrokerListener;
 import net.yacy.grid.mcp.Configuration;
 import net.yacy.grid.mcp.MCP;
@@ -82,7 +83,7 @@ public class Loader {
             else if ("YACY".equals(userAgentType)) userAgent = ClientIdentification.yacyInternetCrawlerAgent.userAgent;
             else if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
             else userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
-            ApacheHttpClient.initClient(userAgent);
+            LoaderClientConnection.httpClient = ClientConnection.getClosableHttpClient(userAgent);
 
             // initialize REST server with services
             this.service = new Service(this.config);

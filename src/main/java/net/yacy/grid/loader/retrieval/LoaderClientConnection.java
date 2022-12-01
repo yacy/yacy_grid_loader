@@ -37,11 +37,13 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.RequestLine;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
 import net.yacy.grid.http.ClientConnection;
@@ -54,6 +56,15 @@ public class LoaderClientConnection implements HttpClient {
 
     private static String userAgentDefault = ClientIdentification.browserAgent.userAgent;
     public  static CloseableHttpClient httpClient = ClientConnection.getClosableHttpClient(userAgentDefault);
+
+    static {
+        RequestConfig config = RequestConfig.custom()
+          .setConnectTimeout(5000)
+          .setConnectionRequestTimeout(5000)
+          .setSocketTimeout(5000).build();
+        httpClient = 
+          HttpClientBuilder.create().setDefaultRequestConfig(config).build();
+    }
 
     private int status_code;
     private String mime;

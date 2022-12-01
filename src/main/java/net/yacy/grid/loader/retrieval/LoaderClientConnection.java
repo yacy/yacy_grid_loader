@@ -30,6 +30,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLHandshakeException;
 
@@ -54,14 +57,15 @@ public class LoaderClientConnection implements HttpClient {
 
     private static final String CRLF = new String(ClientConnection.CRLF, StandardCharsets.US_ASCII);
 
-    private static String userAgentDefault = ClientIdentification.browserAgent.userAgent;
-    public  static CloseableHttpClient httpClient = ClientConnection.getClosableHttpClient(userAgentDefault);
+    public  static String userAgent = ClientIdentification.browserAgent.userAgent;
+    private static CloseableHttpClient httpClient = ClientConnection.getClosableHttpClient(userAgent);
+    private static ScheduledExecutorService executorService = Executors.newScheduledThreadPool(30);
 
     static {
         RequestConfig config = RequestConfig.custom()
-          .setConnectTimeout(5000)
-          .setConnectionRequestTimeout(5000)
-          .setSocketTimeout(5000).build();
+          .setConnectTimeout(10000)
+          .setConnectionRequestTimeout(10000)
+          .setSocketTimeout(10000).build();
         httpClient = 
           HttpClientBuilder.create().setDefaultRequestConfig(config).build();
     }
@@ -81,7 +85,7 @@ public class LoaderClientConnection implements HttpClient {
         this.header = new HashMap<String, List<String>>();
 
         final HttpRequestBase request = head ? new HttpHead(url) : new HttpGet(url);
-        request.setHeader("User-Agent", userAgentDefault);
+        request.setHeader("User-Agent", userAgent);
         request.setHeader("Accept", "text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2");
 
         // compute the request header (we do this to have a documentation later of what we did)
@@ -97,6 +101,7 @@ public class LoaderClientConnection implements HttpClient {
         // do the request
         HttpResponse httpResponse = null;
         try {
+            executorService.schedule(request::abort, (long)10, TimeUnit.SECONDS);
             httpResponse = httpClient.execute(request);
         } catch (final UnknownHostException e) {
             request.releaseConnection();

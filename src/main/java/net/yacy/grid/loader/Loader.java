@@ -83,7 +83,7 @@ public class Loader {
             else if ("YACY".equals(userAgentType)) userAgent = ClientIdentification.yacyInternetCrawlerAgent.userAgent;
             else if ("GOOGLE".equals(userAgentType)) userAgent = ClientIdentification.getAgent(ClientIdentification.googleAgentName).userAgent;
             else userAgent = ClientIdentification.getAgent(ClientIdentification.browserAgentName).userAgent;
-            LoaderClientConnection.httpClient = ClientConnection.getClosableHttpClient(userAgent);
+            LoaderClientConnection.userAgent = userAgent;
 
             // initialize REST server with services
             this.service = new Service(this.config);

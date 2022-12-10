@@ -70,9 +70,8 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
         boolean loaderHeadless = crawl.has("loaderHeadless") ? crawl.getBoolean("loaderHeadless") : true;
 
         // construct a WARC
-        ContentLoader cl = new ContentLoader(
-                action, data, true, "api call from " + call.getClientHost(),
-                crawlID, depth, crawlingDepth, loaderHeadless, priority);
+        String threadname = "api call from " + call.getClientHost();
+        ContentLoader cl = new ContentLoader(action, data, true, threadname, crawlID, depth, crawlingDepth, loaderHeadless, priority);
         byte[] b = cl.getContent();
 
         // store the WARC as asset if wanted

@@ -100,7 +100,7 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         // read query attributes
         final String id = call.get("id", "*id*"); // the crawl id
         String url = call.get("url", "");
-        final int urlCount = 1;
+        final int urlCount = call.get("urlCount", 0);
         final int depth = call.get("depth", 0);
         final int crawlingDepth = call.get("crawlingDepth", 0); // the maximum depth for the crawl start of this domain
         final boolean loaderHeadless = call.get("loaderHeadless", false);
@@ -123,7 +123,11 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         // create action
         final JSONObject action = new JSONObject();
         final JSONArray urls = new JSONArray();
-        urls.put(url);
+        if (url.length() > 0) urls.put(url);
+        if (urlCount > 0) for (int i = 0; i < urlCount; i++) {
+            url = call.get("url_" + i, "");
+            if (url.length() > 0) urls.put(url);
+        }
         action.put("id", id);
         action.put("type", RenderType.loader.name());
         action.put("queue", "loader");
@@ -131,11 +135,6 @@ public class ProcessService extends ObjectAPIHandler implements APIHandler {
         action.put("depth", depth);
         if (collection.length() > 0) action.put("collection", collection);
         if (targetasset.length() > 0) action.put("targetasset", targetasset);
-        if (url.length() > 0) urls.put(url);
-        if (urlCount > 0) for (int i = 0; i < urlCount; i++) {
-            url = call.get("url_" + i, "");
-            if (url.length() > 0) urls.put(url);
-        }
         process.addAction(new SusiAction(action));
         process.setData(new JSONArray().put(crawl));
 

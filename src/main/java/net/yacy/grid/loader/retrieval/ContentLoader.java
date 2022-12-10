@@ -19,14 +19,11 @@
 
 package net.yacy.grid.loader.retrieval;
 
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -79,16 +76,7 @@ public class ContentLoader {
         Thread.currentThread().setName(threadnameprefix + " loading " + urlss.toString());
 
         // construct a WARC
-        OutputStream out;
-        File tmp = null;
-        try {
-            tmp = createTempFile("yacygridloader", ".warc");
-            //Data.logger.info("creating temporary file: " + tmp.getAbsolutePath());
-            out = new BufferedOutputStream(new FileOutputStream(tmp));
-        } catch (final IOException e) {
-            tmp = null;
-            out = new ByteArrayOutputStream();
-        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             final WarcWriter ww = ContentLoader.initWriter(out, warcPayload, compressed);
             final Map<String, ActionResult> errors = ContentLoader.load(ww, urlss, threadnameprefix, id, depth, crawlingDepth, loaderHeadless, priority);
@@ -103,24 +91,8 @@ public class ContentLoader {
         } finally {
             if (out != null) try {out.close();} catch (final IOException e) {}
         }
-        if (out instanceof ByteArrayOutputStream) {
-            this.content = ((ByteArrayOutputStream) out).toByteArray();
-            this.result = ActionResult.SUCCESS;
-            return;
-        } else {
-            try {
-                // open the file again to create a byte[]
-                this.content = Files.readAllBytes(tmp.toPath());
-                this.result = ActionResult.SUCCESS;
-                tmp.delete();
-                if (tmp.exists()) tmp.deleteOnExit();
-                return;
-            } catch (final IOException e) {
-                // this should not happen since we had been able to open the file
-                Logger.warn(this.getClass(), e);
-                return; // fail irreversible
-            }
-        }
+        this.content = ((ByteArrayOutputStream) out).toByteArray();
+        this.result = ActionResult.SUCCESS;
     }
 
 
@@ -237,8 +209,8 @@ public class ContentLoader {
         // here we know the content type
         byte[] content = null;
 
-        String requestHeaders = ac.getRequestHeader().toString();
-        String responseHeaders = ac.getResponseHeader().toString();
+        String requestHeaders = ac.getRequestHeader();
+        String responseHeaders = ac.getResponseHeader();
 
         final MultiProtocolURL u = new MultiProtocolURL(url);
         if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {

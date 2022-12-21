@@ -59,11 +59,11 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
 
         // extract call parameter here to enhance ability to debug
         SusiAction action = process.getActions().get(0);
-        JSONArray data = process.getData();
+        JSONArray processData = process.getData();
 
         // find out if we should do headless loading
         String crawlID = action.getStringAttr("id");
-        JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+        JSONObject crawl = SusiThought.selectData(processData, "id", crawlID);
         int depth = action.getIntAttr("depth");
         int crawlingDepth = crawl.getInt("crawlingDepth");
         int priority =  crawl.has("priority") ? crawl.getInt("priority") : 0;
@@ -71,7 +71,7 @@ public class LoaderService extends ObjectAPIHandler implements APIHandler {
 
         // construct a WARC
         String threadname = "api call from " + call.getClientHost();
-        ContentLoader cl = new ContentLoader(action, data, true, threadname, crawlID, depth, crawlingDepth, loaderHeadless, priority);
+        ContentLoader cl = new ContentLoader(action, processData, true, threadname, crawlID, depth, crawlingDepth, loaderHeadless, priority);
         byte[] b = cl.getContent();
 
         // store the WARC as asset if wanted

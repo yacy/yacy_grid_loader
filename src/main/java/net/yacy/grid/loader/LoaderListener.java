@@ -110,7 +110,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
     }
 
     @Override
-    public ActionResult processAction(final SusiAction action, final JSONArray data, final String processName, final int processNumber) {
+    public ActionResult processAction(final SusiAction action, final JSONArray processData, final String processName, final int processNumber) {
 
         // check short memory status
         if (Memory.shortStatus()) {
@@ -123,7 +123,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
             Logger.info(this.getClass(), "Loader.processAction Fail: Action does not have an id: " + action.toString());
             return ActionResult.FAIL_IRREVERSIBLE;
         }
-        final JSONObject crawl = SusiThought.selectData(data, "id", crawlID);
+        final JSONObject crawl = SusiThought.selectData(processData, "id", crawlID);
         if (crawl == null) {
             Logger.info(this.getClass(), "Loader.processAction Fail: ID of Action not found in data: " + action.toString());
             return ActionResult.FAIL_IRREVERSIBLE;
@@ -142,7 +142,7 @@ public class LoaderListener extends AbstractBrokerListener implements BrokerList
             ActionResult actionResult = ActionResult.SUCCESS;
             final byte[] b;
             try {
-                final ContentLoader cl = new ContentLoader(action, data, targetasset.endsWith(".gz"), threadnameprefix, crawlID, depth, crawlingDepth, loaderHeadless, priority);
+                final ContentLoader cl = new ContentLoader(action, processData, targetasset.endsWith(".gz"), threadnameprefix, crawlID, depth, crawlingDepth, loaderHeadless, priority);
                 b = cl.getContent();
                 actionResult = cl.getResult();
             } catch (final Throwable e) {

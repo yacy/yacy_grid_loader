@@ -47,7 +47,7 @@ import net.yacy.grid.io.index.CrawlerDocument.Status;
 import net.yacy.grid.loader.JwatWarcWriter;
 import net.yacy.grid.mcp.BrokerListener.ActionResult;
 import net.yacy.grid.mcp.Service;
-import net.yacy.grid.tools.Classification.ContentDomain;
+import net.yacy.grid.tools.Classification;
 import net.yacy.grid.tools.Digest;
 import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.MultiProtocolURL;
@@ -215,7 +215,8 @@ public class ContentLoader {
             // using the headless loader only makes sense in certain situations:
             // we must make sure that the content is actually html, othwewise there is
             // no point in usage of the headless loader and we would fall back to normal loading.
-            boolean isHtml = u.getContentDomainFromExt() == ContentDomain.TEXT;
+            String ext = MultiProtocolURL.getFileExtension(u.getFileName());
+            boolean isHtml = Classification.isHtmlExtension(ext);
 
             // not all content that is actually html requires an text extension, we also check the mime type by using a head request
             if (!isHtml) {

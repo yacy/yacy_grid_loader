@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.jwat.warc.WarcWriter;
@@ -51,6 +53,8 @@ import net.yacy.grid.tools.Logger;
 import net.yacy.grid.tools.MultiProtocolURL;
 
 public class ContentLoader {
+
+    private final static Pattern charsetPattern = Pattern.compile("charset=([^\\s]+)");
 
     private byte[] content;
     private ActionResult result;
@@ -202,45 +206,71 @@ public class ContentLoader {
 
     private static boolean loadHTTP(final WarcWriter warcWriter, final String url, final String threadName, final boolean useHeadlessLoader) throws IOException {// check short memory status
         final Date loaddate = new Date();
-
-        // first do a HEAD request to find the mime type
-        LoaderClientConnection ac = new LoaderClientConnection(url, true);
-
-        // here we know the content type
         byte[] content = null;
-
-        String requestHeaders = ac.getRequestHeader();
-        String responseHeaders = ac.getResponseHeader();
-
+        String requestHeaders = null;
+        String responseHeaders = null;
         final MultiProtocolURL u = new MultiProtocolURL(url);
-        if (useHeadlessLoader && (ac.getMime().endsWith("/html") || ac.getMime().endsWith("/xhtml+xml") || u.getContentDomainFromExt() == ContentDomain.TEXT)) try {
-            // use htmlunit to load this
-            final HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
-            final String xml = htmlUnitLoader.getXml();
 
-            requestHeaders = htmlUnitLoader.getRequestHeaders();
-            responseHeaders = htmlUnitLoader.getResponseHeaders();
+        if (useHeadlessLoader) {
+            // using the headless loader only makes sense in certain situations:
+            // we must make sure that the content is actually html, othwewise there is
+            // no point in usage of the headless loader and we would fall back to normal loading.
+            boolean isHtml = u.getContentDomainFromExt() == ContentDomain.TEXT;
 
-            content = xml.getBytes(StandardCharsets.UTF_8);
-        } catch (final Throwable e) {
-            // do nothing here, input stream is not set
-            final String cause = e == null ? "null" : e.getMessage();
-            if (cause != null && cause.indexOf("404") >= 0) {
-                throw new IOException("" + url + " fail: " + cause);
+            // not all content that is actually html requires an text extension, we also check the mime type by using a head request
+            if (!isHtml) {
+                LoaderClientConnection ac = new LoaderClientConnection(url, true);
+                String mime = ac.getMime();
+                isHtml = mime.endsWith("/html") || mime.endsWith("/xhtml+xml");
             }
-            Logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
+
+            // finally we use the headless loader to get the content
+            if (isHtml) try {
+                // use htmlunit to load this
+                final HtmlUnitLoader htmlUnitLoader = new HtmlUnitLoader(url, threadName);
+                final String xml = htmlUnitLoader.getXml();
+
+                requestHeaders = htmlUnitLoader.getRequestHeaders();
+                responseHeaders = htmlUnitLoader.getResponseHeaders();
+
+                // we consider that the resulting charset should be UTF_8
+                content = xml.getBytes(StandardCharsets.UTF_8);
+
+                // However, the original Content-Type may denote a different charset
+                // Therefore we must patch that charset now in the response header
+                Matcher matcher = charsetPattern.matcher(responseHeaders);
+                if (matcher.find()) {
+                    String oldCharset = matcher.group(1);
+                    String newCharset = StandardCharsets.UTF_8.name();
+                    if (!oldCharset.equals(newCharset)) {
+                        StringBuffer sb = new StringBuffer();
+                        matcher.appendReplacement(sb, "charset=" + newCharset);
+                        matcher.appendTail(sb);
+                        responseHeaders = sb.toString();
+                    }
+                }
+            } catch (final Throwable e) {
+                // do nothing here, input stream is not set
+                final String cause = e == null ? "null" : e.getMessage();
+                if (cause != null && cause.indexOf("404") >= 0) {
+                    throw new IOException("" + url + " fail: " + cause);
+                }
+                Logger.debug("Loader - HtmlUnit failed (will retry): " + cause);
+            }
         }
 
+        // Here we may not have loaded the content because of not-required headless loading or
+        // because headless loading has failed. Do a normal loading:
         if (content == null) {
             // do another http request. This can either happen because mime type is not html
             // or it was html and HtmlUnit has failed - we retry the normal way here.
 
-            ac = new LoaderClientConnection(url, false);
+            LoaderClientConnection ac = new LoaderClientConnection(url, false);
             final int status = ac.getStatusCode();
             if (status != 200) return false;
 
-            requestHeaders = ac.getRequestHeader().toString();
-            responseHeaders = ac.getResponseHeader().toString();
+            requestHeaders = ac.getRequestHeader();
+            responseHeaders = ac.getResponseHeader();
 
             content = ac.getContent();
         }
@@ -261,15 +291,31 @@ public class ContentLoader {
         return true;
     }
 
-    /*
-    public static void main(String[] args) {
-        Data.init(new File("data/mcp-8100"), new HashMap<String, String>(), false);
-        List<String> urls = new ArrayList<>();
-        urls.add("https://krefeld.polizei.nrw/");
-        //urls.add("https://www.justiz.nrw/Gerichte_Behoerden/anschriften/berlin_bruessel/index.php");
-        byte[] warc = load(urls, "Test".getBytes(), false, "test", true);
-        System.out.println(new String(warc, StandardCharsets.UTF_8));
+    private static String getTestWarcContent(String url, boolean loaderHeadless) {
+        final byte[] warcPayload = "test".getBytes(StandardCharsets.UTF_8);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            WarcWriter warcWriter = ContentLoader.initWriter(out, warcPayload, false);
+            loadHTTP(warcWriter, url, "test", loaderHeadless);
+            warcWriter.close();
+            out.close();
+            String b = new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return b;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
-    */
+
+    public static void main(String[] args) {
+        String url = "https://www.schulministerium.nrw.de/BiPo/SchuleAendern/msbleikaleistungen.html?katalogId=99088003034004";
+
+        String headless = getTestWarcContent(url, true);
+        String normal   = getTestWarcContent(url, false);
+        System.out.println("headless:\n" + headless);
+        System.out.println("\nnormal:\n" + normal);
+        //System.out.println("Difference: " + StringUtils.difference(headless, normal)); // requires import org.apache.commons.lang3.StringUtils;
+        System.exit(0);
+    }
 
 }
